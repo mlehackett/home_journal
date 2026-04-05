@@ -38,6 +38,98 @@
     overflow-x: hidden;
   }
 
+  /* SETUP SCREEN */
+  #setup-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 40px 24px;
+    gap: 24px;
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  #setup-screen.visible { display: flex; }
+
+  .setup-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--ink);
+    text-align: center;
+  }
+  .setup-title span { color: var(--accent); font-style: italic; }
+
+  .setup-desc {
+    font-size: 15px;
+    color: var(--ink2);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .setup-field { display: flex; flex-direction: column; gap: 6px; }
+
+  .setup-field label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--ink2);
+  }
+
+  .setup-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+
+  .setup-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+  }
+  .setup-btn:active { background: #147a85; }
+
+  .setup-error {
+    font-size: 13px;
+    color: var(--red);
+    text-align: center;
+    display: none;
+  }
+  .setup-error.visible { display: block; }
+
+  /* MAIN APP */
+  #main-app { display: none; flex-direction: column; flex: 1; }
+  #main-app.visible { display: flex; }
+
   .app-header {
     background: var(--ink);
     color: var(--bg);
@@ -116,7 +208,6 @@
     text-transform: uppercase; color: var(--ink2); padding: 0 2px;
   }
 
-  /* CHORE CARD */
   .chore-card {
     display: flex; flex-direction: column;
     border: 1.5px solid var(--border);
@@ -176,7 +267,6 @@
   }
   .hist-toggle.open { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 
-  /* INLINE HISTORY PANEL */
   .chore-history {
     display: none; flex-direction: column;
     border-top: 1px solid var(--border); background: var(--bg);
@@ -196,7 +286,6 @@
   .hist-item:last-child { border-bottom: none; }
 
   .hist-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
-
   .hist-date { flex: 1; font-size: 13px; color: var(--ink2); }
 
   .hist-user {
@@ -213,7 +302,6 @@
 
   .hist-empty { padding: 14px 16px; font-size: 13px; color: var(--ink2); font-style: italic; }
 
-  /* OTHER CHORE */
   .other-section {
     background: var(--surface); border: 1.5px dashed var(--border);
     border-radius: var(--radius); padding: 16px 18px;
@@ -245,7 +333,24 @@
   .settings-row { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
   .settings-row:last-child { border-bottom: none; }
   .settings-label { font-size: 12px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink2); }
-  .settings-val { font-size: 14px; color: var(--ink); background: var(--bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); word-break: break-all; }
+
+  .settings-input {
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    padding: 8px 12px; border-radius: 8px;
+    border: 1.5px solid var(--border); background: var(--bg);
+    color: var(--ink); outline: none; transition: border-color 0.2s;
+    width: 100%;
+  }
+  .settings-input:focus { border-color: var(--accent); }
+
+  .settings-save {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    padding: 11px; border-radius: 10px; border: none;
+    background: var(--accent); color: white; cursor: pointer;
+    transition: background 0.2s; width: 100%;
+  }
+  .settings-save:active { background: #147a85; }
+
   .settings-note { font-size: 13px; color: var(--ink2); line-height: 1.5; padding: 12px 16px; background: var(--green-light); border-top: 1px solid var(--border); }
 
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink2); font-size: 15px; }
@@ -255,83 +360,154 @@
 </head>
 <body>
 
-<header class="app-header">
-  <div class="app-title">Home <span>Chore</span> Log</div>
-  <div class="user-picker">
-    <button class="user-btn active" data-user="MLE" onclick="setUser('MLE')">MLE</button>
-    <button class="user-btn" data-user="CYD" onclick="setUser('CYD')">CYD</button>
-  </div>
-</header>
-
-<nav class="tab-bar">
-  <button class="tab-btn active" onclick="showTab('log',event)">Log Chore</button>
-  <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
-</nav>
-
-<!-- LOG TAB -->
-<div class="tab-content active" id="tab-log">
-  <div class="status-bar">
-    <div class="status-dot" id="status-dot"></div>
-    <span id="status-text">Loading chores…</span>
-  </div>
-  <div class="section-label">Chores</div>
-  <div id="chore-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
-  <div class="other-section">
-    <div class="other-label">➕ Add &amp; Log Other Chore</div>
-    <div class="other-row">
-      <input class="other-input" id="other-input" type="text" placeholder="e.g. Vacuum living room" autocomplete="off" autocapitalize="words">
-      <button class="other-submit" id="other-submit" onclick="logOther()">Log It</button>
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-title">Home <span>Chore</span> Log</div>
+  <div class="setup-desc">Enter your Adafruit IO credentials to get started. These are stored only on this device.</div>
+  <div class="setup-card">
+    <div class="setup-field">
+      <label>Adafruit IO Username</label>
+      <input class="setup-input" id="setup-username" type="text" placeholder="e.g. mlehackett" autocomplete="off" autocapitalize="none">
     </div>
+    <div class="setup-field">
+      <label>Adafruit IO Key</label>
+      <input class="setup-input" id="setup-key" type="text" placeholder="aio_xxxx…" autocomplete="off" autocapitalize="none">
+    </div>
+    <button class="setup-btn" onclick="saveSetup()">Get Started</button>
+    <div class="setup-error" id="setup-error">Please enter both your username and key.</div>
   </div>
 </div>
 
-<!-- SETTINGS TAB -->
-<div class="tab-content" id="tab-settings">
-  <div class="section-label">Adafruit IO Config</div>
-  <div class="settings-group">
-    <div class="settings-row">
-      <div class="settings-label">Username</div>
-      <div class="settings-val" id="s-username"></div>
+<!-- MAIN APP -->
+<div id="main-app">
+  <header class="app-header">
+    <div class="app-title">Home <span>Chore</span> Log</div>
+    <div class="user-picker">
+      <button class="user-btn active" data-user="MLE" onclick="setUser('MLE')">MLE</button>
+      <button class="user-btn" data-user="CYD" onclick="setUser('CYD')">CYD</button>
     </div>
-    <div class="settings-row">
-      <div class="settings-label">API Key</div>
-      <div class="settings-val" id="s-apikey"></div>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('log',event)">Log Chore</button>
+    <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
+  </nav>
+
+  <!-- LOG TAB -->
+  <div class="tab-content active" id="tab-log">
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Loading chores…</span>
     </div>
-    <div class="settings-row">
-      <div class="settings-label">Feed Group</div>
-      <div class="settings-val" id="s-group"></div>
+    <div class="section-label">Chores</div>
+    <div id="chore-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="other-section">
+      <div class="other-label">➕ Add &amp; Log Other Chore</div>
+      <div class="other-row">
+        <input class="other-input" id="other-input" type="text" placeholder="e.g. Vacuum living room" autocomplete="off" autocapitalize="words">
+        <button class="other-submit" id="other-submit" onclick="logOther()">Log It</button>
+      </div>
     </div>
-    <div class="settings-note">Credentials are baked into this file. To update them, edit the JS config at the top of the HTML source.</div>
   </div>
-  <div class="section-label" style="margin-top:8px">Users</div>
-  <div class="settings-group">
-    <div class="settings-row">
-      <div class="settings-label">Logged Users</div>
-      <div class="settings-val">MLE &amp; CYD</div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-content" id="tab-settings">
+    <div class="section-label">Adafruit IO</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Username</div>
+        <input class="settings-input" id="s-username" type="text" autocapitalize="none" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">API Key</div>
+        <input class="settings-input" id="s-apikey" type="text" autocapitalize="none" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <button class="settings-save" onclick="saveCredentials()">Save Credentials</button>
+      </div>
+      <div class="settings-note">Credentials are stored only on this device in browser storage. The file itself contains no credentials.</div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Feed Group</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Group Key</div>
+        <div style="font-size:14px;color:var(--ink);padding:4px 0">home-chore-log</div>
+      </div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Users</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Logged Users</div>
+        <div style="font-size:14px;color:var(--ink);padding:4px 0">MLE &amp; CYD</div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-const AIO_USERNAME   = "mlehackett";
-const AIO_KEY        = "aio_chwo240uRKqeH5Ogi31jeKFewkZp";
 const FEED_GROUP     = "home-chore-log";
-const GROUP_LABEL    = "home_chore_log";
 const QUANTITY_FEEDS = ["bags_of_salt"];
 
-const AIO_BASE = `https://io.adafruit.com/api/v2/${AIO_USERNAME}`;
-const HEADERS  = { "X-AIO-Key": AIO_KEY, "Content-Type": "application/json" };
+let AIO_USERNAME = "";
+let AIO_KEY      = "";
+let AIO_BASE     = "";
+let HEADERS      = {};
 
 let currentUser = "MLE";
 let choreFeeds  = [];
 
+// ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("s-username").textContent = AIO_USERNAME;
-  document.getElementById("s-apikey").textContent   = AIO_KEY;
-  document.getElementById("s-group").textContent    = GROUP_LABEL;
-  loadFeeds();
+  const storedUser = localStorage.getItem("aio_username");
+  const storedKey  = localStorage.getItem("aio_key");
+
+  if (storedUser && storedKey) {
+    initApp(storedUser, storedKey);
+  } else {
+    document.getElementById("setup-screen").classList.add("visible");
+  }
 });
 
+function initApp(username, key) {
+  AIO_USERNAME = username;
+  AIO_KEY      = key;
+  AIO_BASE     = `https://io.adafruit.com/api/v2/${AIO_USERNAME}`;
+  HEADERS      = { "X-AIO-Key": AIO_KEY, "Content-Type": "application/json" };
+
+  document.getElementById("setup-screen").classList.remove("visible");
+  document.getElementById("main-app").classList.add("visible");
+  document.getElementById("s-username").value = AIO_USERNAME;
+  document.getElementById("s-apikey").value   = AIO_KEY;
+
+  loadFeeds();
+}
+
+function saveSetup() {
+  const username = document.getElementById("setup-username").value.trim();
+  const key      = document.getElementById("setup-key").value.trim();
+  const err      = document.getElementById("setup-error");
+
+  if (!username || !key) {
+    err.classList.add("visible");
+    return;
+  }
+  err.classList.remove("visible");
+  localStorage.setItem("aio_username", username);
+  localStorage.setItem("aio_key", key);
+  initApp(username, key);
+}
+
+function saveCredentials() {
+  const username = document.getElementById("s-username").value.trim();
+  const key      = document.getElementById("s-apikey").value.trim();
+  if (!username || !key) return;
+  localStorage.setItem("aio_username", username);
+  localStorage.setItem("aio_key", key);
+  initApp(username, key);
+  setStatus("ok", "Credentials saved. Reloading feeds…");
+}
+
+// ── USER ─────────────────────────────────────────────────────────────────────
 function setUser(u) {
   currentUser = u;
   document.querySelectorAll(".user-btn").forEach(b => b.classList.toggle("active", b.dataset.user === u));
@@ -344,7 +520,7 @@ function showTab(name, e) {
   if (e && e.currentTarget) e.currentTarget.classList.add("active");
 }
 
-// Only first word capitalized: "bags_of_salt" → "Bags of salt"
+// ── NAME HELPERS ──────────────────────────────────────────────────────────────
 function feedKeyToDisplay(key) {
   const words = key.split("_");
   words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1);
@@ -356,22 +532,16 @@ function displayToFeedKey(name) {
 }
 
 // ── VALUE ENCODING ────────────────────────────────────────────────────────────
-// Values are stored as "USER:quantity" e.g. "MLE:1" or "CYD:4"
-// Legacy values without a colon are treated as having no user.
-function encodeValue(user, quantity) {
-  return `${user}:${quantity}`;
-}
+function encodeValue(user, quantity) { return `${user}:${quantity}`; }
 
 function decodeValue(raw) {
   if (!raw) return { user: "—", quantity: "?" };
   const colon = raw.indexOf(":");
   if (colon === -1) return { user: "—", quantity: raw };
-  return {
-    user: raw.substring(0, colon),
-    quantity: raw.substring(colon + 1)
-  };
+  return { user: raw.substring(0, colon), quantity: raw.substring(colon + 1) };
 }
 
+// ── LOAD FEEDS ───────────────────────────────────────────────────────────────
 async function loadFeeds() {
   setStatus("loading", "Loading chores from Adafruit IO…");
   try {
