@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chore Log">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Home Chore Log</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-title">Home <span>Chore</span> Log</div>
+  <div class="setup-desc">Enter your Adafruit IO credentials to get started. These are stored only on this device.</div>
+  <div class="setup-card">
+    <div class="setup-field">
+      <label>Adafruit IO Username</label>
+      <input class="setup-input" id="setup-username" type="text" placeholder="e.g. mlehackett" autocomplete="off" autocapitalize="none">
+    </div>
+    <div class="setup-field">
+      <label>Adafruit IO Key</label>
+      <input class="setup-input" id="setup-key" type="text" placeholder="aio_xxxx…" autocomplete="off" autocapitalize="none">
+    </div>
+    <button class="setup-btn" onclick="saveSetup()">Get Started</button>
+    <div class="setup-error" id="setup-error">Please enter both your username and key.</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <header class="app-header">
+    <div class="app-title">Home <span>Chore</span> Log</div>
+    <div class="user-picker">
+      <button class="user-btn active" data-user="MLE" onclick="setUser('MLE')">MLE</button>
+      <button class="user-btn" data-user="CYD" onclick="setUser('CYD')">CYD</button>
+    </div>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('log',event)">Log Chore</button>
+    <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
+  </nav>
+
+  <!-- LOG TAB -->
+  <div class="tab-content active" id="tab-log">
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Loading chores…</span>
+    </div>
+    <div class="section-label">Chores</div>
+    <div id="chore-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="other-section">
+      <div class="other-label">➕ Add &amp; Log Other Chore</div>
+      <div class="other-row">
+        <input class="other-input" id="other-input" type="text" placeholder="e.g. Vacuum living room" autocomplete="off" autocapitalize="words">
+        <button class="other-submit" id="other-submit" onclick="logOther()">Log It</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-content" id="tab-settings">
+    <div class="section-label">Adafruit IO</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Username</div>
+        <input class="settings-input" id="s-username" type="text" autocapitalize="none" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">API Key</div>
+        <input class="settings-input" id="s-apikey" type="text" autocapitalize="none" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <button class="settings-save" onclick="saveCredentials()">Save Credentials</button>
+      </div>
+      <div class="settings-note">Credentials are stored only on this device. The files in GitHub contain no credentials.</div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Feed Group</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Group Key</div>
+        <div class="settings-static">home-chore-log</div>
+      </div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Users</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Logged Users</div>
+        <div class="settings-static">MLE &amp; CYD</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
