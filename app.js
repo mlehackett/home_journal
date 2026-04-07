@@ -12,7 +12,6 @@ let HEADERS      = {};
 let currentUser   = "MLE";
 let choreFeeds    = [];
 let wildlifeFeeds = [];
-let wildlifeFeeds = [];
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
