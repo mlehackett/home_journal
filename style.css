@@ -44,7 +44,6 @@ body {
 
 .setup-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--ink); text-align: center; }
 .setup-title span { color: var(--accent); font-style: italic; }
-
 .setup-desc { font-size: 15px; color: var(--ink2); text-align: center; line-height: 1.6; }
 
 .setup-card {
@@ -54,7 +53,6 @@ body {
 }
 
 .setup-field { display: flex; flex-direction: column; gap: 6px; }
-
 .setup-field label { font-size: 12px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink2); }
 
 .setup-input {
@@ -140,7 +138,7 @@ body {
 
 .section-label { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink2); padding: 0 2px; }
 
-/* ── CHORE CARDS ───────────────────────────────────────────────────────────── */
+/* ── CHORE / WILDLIFE CARDS ────────────────────────────────────────────────── */
 .chore-card {
   display: flex; flex-direction: column;
   border: 1.5px solid var(--border); border-radius: var(--radius);
@@ -166,7 +164,6 @@ body {
   display: flex; align-items: center; justify-content: center; transition: background 0.15s;
 }
 .qty-btn:active { background: var(--surface2); }
-
 .qty-val { min-width: 26px; text-align: center; font-size: 14px; font-weight: 600; color: var(--ink); pointer-events: none; }
 
 /* ── BUTTONS ───────────────────────────────────────────────────────────────── */
@@ -206,7 +203,7 @@ body {
 .hist-val { font-size: 13px; font-weight: 600; color: var(--ink2); background: var(--surface2); padding: 2px 8px; border-radius: 20px; min-width: 28px; text-align: center; }
 .hist-empty { padding: 14px 16px; font-size: 13px; color: var(--ink2); font-style: italic; }
 
-/* ── OTHER CHORE ───────────────────────────────────────────────────────────── */
+/* ── OTHER / ADD ───────────────────────────────────────────────────────────── */
 .other-section { background: var(--surface); border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
 .other-label { font-size: 13px; font-weight: 600; color: var(--ink2); }
 .other-row { display: flex; gap: 8px; align-items: center; }
@@ -228,6 +225,79 @@ body {
 }
 .other-submit:active { background: #147a85; }
 .other-submit:disabled { background: var(--border); color: var(--ink2); }
+
+/* ── DIARY ─────────────────────────────────────────────────────────────────── */
+.diary-compose {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.diary-textarea {
+  font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.6;
+  padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: 10px; background: var(--bg); color: var(--ink);
+  outline: none; transition: border-color 0.2s;
+  resize: vertical; min-height: 120px; width: 100%;
+}
+.diary-textarea:focus { border-color: var(--accent); }
+.diary-textarea::placeholder { color: var(--ink2); opacity: 0.6; }
+
+.diary-submit {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  padding: 11px; border-radius: 10px; border: none;
+  background: var(--accent); color: white; cursor: pointer;
+  transition: background 0.2s; width: 100%;
+}
+.diary-submit:active { background: #147a85; }
+
+.refresh-btn {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  padding: 10px 16px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--ink2);
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.refresh-btn:active { background: var(--surface2); }
+
+.diary-entry {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+
+.diary-entry-header {
+  padding: 14px 16px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: background 0.15s;
+  position: relative;
+}
+.diary-entry-header:active { background: var(--surface2); }
+
+.diary-entry-meta {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.diary-entry-date { font-size: 12px; color: var(--ink2); flex: 1; }
+
+.diary-entry-preview {
+  font-size: 14px; color: var(--ink); line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.diary-chevron {
+  position: absolute; right: 16px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px; color: var(--ink2);
+  transition: transform 0.2s;
+}
+
+.diary-entry-body {
+  display: none;
+  padding: 0 16px 16px;
+  font-size: 15px; line-height: 1.7; color: var(--ink);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.diary-entry-body.open { display: block; }
 
 /* ── SETTINGS ──────────────────────────────────────────────────────────────── */
 .settings-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }

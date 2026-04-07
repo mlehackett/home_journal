@@ -1,0 +1,24 @@
+{
+  "name": "Home Journal",
+  "short_name": "Home Journal",
+  "description": "Home chore log, wildlife log and diary",
+  "start_url": "/home_journal/",
+  "display": "standalone",
+  "background_color": "#0F2830",
+  "theme_color": "#0F2830",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

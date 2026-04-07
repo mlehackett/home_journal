@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Chore Log">
+<meta name="apple-mobile-web-app-title" content="Home Journal">
 <link rel="apple-touch-icon" href="icon.png">
-<title>Home Chore Log</title>
+<link rel="manifest" href="manifest.json">
+<title>Home Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -15,7 +16,7 @@
 
 <!-- SETUP SCREEN -->
 <div id="setup-screen">
-  <div class="setup-title">Home <span>Chore</span> Log</div>
+  <div class="setup-title">Home <span>Journal</span></div>
   <div class="setup-desc">Enter your Adafruit IO credentials to get started. These are stored only on this device.</div>
   <div class="setup-card">
     <div class="setup-field">
@@ -34,7 +35,7 @@
 <!-- MAIN APP -->
 <div id="main-app">
   <header class="app-header">
-    <div class="app-title">Home <span>Chore</span> Log</div>
+    <div class="app-title">Home <span>Journal</span></div>
     <div class="user-picker">
       <button class="user-btn active" data-user="MLE" onclick="setUser('MLE')">MLE</button>
       <button class="user-btn" data-user="CYD" onclick="setUser('CYD')">CYD</button>
@@ -42,11 +43,13 @@
   </header>
 
   <nav class="tab-bar">
-    <button class="tab-btn active" onclick="showTab('log',event)">Log Chore</button>
+    <button class="tab-btn active" onclick="showTab('log',event)">Chores</button>
+    <button class="tab-btn" onclick="showTab('wildlife',event)">Wildlife</button>
+    <button class="tab-btn" onclick="showTab('diary',event)">Diary</button>
     <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
   </nav>
 
-  <!-- LOG TAB -->
+  <!-- CHORES TAB -->
   <div class="tab-content active" id="tab-log">
     <div class="status-bar">
       <div class="status-dot" id="status-dot"></div>
@@ -58,9 +61,42 @@
       <div class="other-label">➕ Add &amp; Log Other Chore</div>
       <div class="other-row">
         <input class="other-input" id="other-input" type="text" placeholder="e.g. Vacuum living room" autocomplete="off" autocapitalize="words">
-        <button class="other-submit" id="other-submit" onclick="logOther()">Log It</button>
+        <button class="other-submit" id="other-submit" onclick="logOtherChore()">Log It</button>
       </div>
     </div>
+  </div>
+
+  <!-- WILDLIFE TAB -->
+  <div class="tab-content" id="tab-wildlife">
+    <div class="status-bar">
+      <div class="status-dot" id="wildlife-status-dot"></div>
+      <span id="wildlife-status-text">Loading species…</span>
+    </div>
+    <div class="section-label">Species</div>
+    <div id="wildlife-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="other-section">
+      <div class="other-label">➕ Add &amp; Log Other Species</div>
+      <div class="other-row">
+        <input class="other-input" id="wildlife-other-input" type="text" placeholder="e.g. Great blue heron" autocomplete="off" autocapitalize="words">
+        <button class="other-submit" id="wildlife-other-submit" onclick="logOtherWildlife()">Log It</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIARY TAB -->
+  <div class="tab-content" id="tab-diary">
+    <div class="status-bar">
+      <div class="status-dot" id="diary-status-dot"></div>
+      <span id="diary-status-text">Ready.</span>
+    </div>
+    <div class="section-label">New Entry</div>
+    <div class="diary-compose">
+      <textarea class="diary-textarea" id="diary-text" placeholder="What's on your mind?"></textarea>
+      <button class="diary-submit" onclick="submitDiaryEntry()">Save Entry</button>
+    </div>
+    <div class="section-label" style="margin-top:4px">Past Entries</div>
+    <button class="refresh-btn" id="diary-refresh-btn" onclick="loadDiaryEntries()">↺ Load entries</button>
+    <div id="diary-list" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 
   <!-- SETTINGS TAB -->
@@ -80,11 +116,19 @@
       </div>
       <div class="settings-note">Credentials are stored only on this device. The files in GitHub contain no credentials.</div>
     </div>
-    <div class="section-label" style="margin-top:8px">Feed Group</div>
+    <div class="section-label" style="margin-top:8px">Feed Groups</div>
     <div class="settings-group">
       <div class="settings-row">
-        <div class="settings-label">Group Key</div>
+        <div class="settings-label">Chores</div>
         <div class="settings-static">home-chore-log</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Wildlife</div>
+        <div class="settings-static">home-wildlife-log</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Diary</div>
+        <div class="settings-static">home-chore-log.diary-entries</div>
       </div>
     </div>
     <div class="section-label" style="margin-top:8px">Users</div>
