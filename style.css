@@ -62,6 +62,7 @@ body {
   outline: none; transition: border-color 0.2s; width: 100%;
 }
 .setup-input:focus { border-color: var(--accent); }
+select.setup-input, select.settings-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A7178' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
 
 .setup-btn {
   font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;

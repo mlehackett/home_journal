@@ -27,6 +27,13 @@
       <label>Adafruit IO Key</label>
       <input class="setup-input" id="setup-key" type="text" placeholder="aio_xxxx…" autocomplete="off" autocapitalize="none">
     </div>
+    <div class="setup-field">
+      <label>Default User for This Device</label>
+      <select class="setup-input" id="setup-default-user">
+        <option value="MLE">MLE</option>
+        <option value="CYD">CYD</option>
+      </select>
+    </div>
     <button class="setup-btn" onclick="saveSetup()">Get Started</button>
     <div class="setup-error" id="setup-error">Please enter both your username and key.</div>
   </div>
@@ -110,6 +117,13 @@
       <div class="settings-row">
         <div class="settings-label">API Key</div>
         <input class="settings-input" id="s-apikey" type="text" autocapitalize="none" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Default User (this device)</div>
+        <select class="settings-input" id="s-default-user">
+          <option value="MLE">MLE</option>
+          <option value="CYD">CYD</option>
+        </select>
       </div>
       <div class="settings-row">
         <button class="settings-save" onclick="saveCredentials()">Save Credentials</button>

@@ -12,11 +12,14 @@ let HEADERS      = {};
 let currentUser   = "MLE";
 let choreFeeds    = [];
 let wildlifeFeeds = [];
+let wildlifeFeeds = [];
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  const storedUser = localStorage.getItem("aio_username");
-  const storedKey  = localStorage.getItem("aio_key");
+  const storedUser    = localStorage.getItem("aio_username");
+  const storedKey     = localStorage.getItem("aio_key");
+  const storedDefault = localStorage.getItem("default_user");
+  if (storedDefault) currentUser = storedDefault;
   if (storedUser && storedKey) {
     initApp(storedUser, storedKey);
   } else {
@@ -34,6 +37,11 @@ function initApp(username, key) {
   document.getElementById("main-app").classList.add("visible");
   document.getElementById("s-username").value = AIO_USERNAME;
   document.getElementById("s-apikey").value   = AIO_KEY;
+  document.getElementById("s-default-user").value = currentUser;
+
+  // Reflect the current (possibly stored) default user in the header
+  document.querySelectorAll(".user-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.user === currentUser));
 
   loadChoreFeeds();
   loadWildlifeFeeds();
@@ -41,22 +49,28 @@ function initApp(username, key) {
 
 // ── SETUP ─────────────────────────────────────────────────────────────────────
 function saveSetup() {
-  const username = document.getElementById("setup-username").value.trim();
-  const key      = document.getElementById("setup-key").value.trim();
-  const err      = document.getElementById("setup-error");
+  const username    = document.getElementById("setup-username").value.trim();
+  const key         = document.getElementById("setup-key").value.trim();
+  const defaultUser = document.getElementById("setup-default-user").value;
+  const err         = document.getElementById("setup-error");
   if (!username || !key) { err.classList.add("visible"); return; }
   err.classList.remove("visible");
   localStorage.setItem("aio_username", username);
   localStorage.setItem("aio_key", key);
+  localStorage.setItem("default_user", defaultUser);
+  currentUser = defaultUser;
   initApp(username, key);
 }
 
 function saveCredentials() {
-  const username = document.getElementById("s-username").value.trim();
-  const key      = document.getElementById("s-apikey").value.trim();
+  const username    = document.getElementById("s-username").value.trim();
+  const key         = document.getElementById("s-apikey").value.trim();
+  const defaultUser = document.getElementById("s-default-user").value;
   if (!username || !key) return;
   localStorage.setItem("aio_username", username);
   localStorage.setItem("aio_key", key);
+  localStorage.setItem("default_user", defaultUser);
+  currentUser = defaultUser;
   initApp(username, key);
   setChoreStatus("ok", "Credentials saved. Reloading…");
 }
