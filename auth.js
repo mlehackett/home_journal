@@ -3,7 +3,7 @@
 // The GIS library is loaded via a script tag in index.html.
 
 const GOOGLE_CLIENT_ID = "1042216799322-nejjr34u08ugkdkb5vdmqlk7mdsg7prd.apps.googleusercontent.com";
-const GOOGLE_SCOPES    = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file";
+const GOOGLE_SCOPES    = "https://www.googleapis.com/auth/drive.file";
 
 let _accessToken    = null;
 let _tokenExpiresAt = 0;
