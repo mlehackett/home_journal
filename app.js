@@ -1,5 +1,5 @@
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const QUANTITY_CHORES = ["Bags of salt"]; // display names that need a qty input
+const QUANTITY_CHORES = ["bags of salt"]; // lowercase - matched case-insensitively
 
 let currentUser = "MLE";
 let choreList   = []; // [{name, isQty, qty, histOpen}]
@@ -102,7 +102,7 @@ async function loadChores() {
     const names = await getUniqueChores();
     choreList = names.map(name => ({
       name,
-      isQty: QUANTITY_CHORES.includes(name),
+      isQty: QUANTITY_CHORES.includes(name.toLowerCase()),
       qty: 3,
       histOpen: false
     }));

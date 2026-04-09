@@ -13,11 +13,17 @@ const SHEET_DIARY    = "Diary";
 // ── SPREADSHEET INIT ──────────────────────────────────────────────────────────
 
 // Returns the spreadsheet ID, creating it if needed.
+let _creatingSpreadsheet = null; // promise lock
+
 async function getOrCreateSpreadsheet() {
-  // Check localStorage
+  // Check localStorage first
   const stored = localStorage.getItem("spreadsheet_id");
   if (stored) return stored;
-  return await createSpreadsheet();
+  // If already creating, wait for that to finish
+  if (_creatingSpreadsheet) return await _creatingSpreadsheet;
+  // Start creation and lock
+  _creatingSpreadsheet = createSpreadsheet().finally(() => { _creatingSpreadsheet = null; });
+  return await _creatingSpreadsheet;
 }
 
 async function createSpreadsheet() {
