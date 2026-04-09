@@ -17,16 +17,8 @@
 <!-- SETUP SCREEN -->
 <div id="setup-screen">
   <div class="setup-title">Home <span>Journal</span></div>
-  <div class="setup-desc">Enter your Adafruit IO credentials to get started. These are stored only on this device.</div>
+  <div class="setup-desc">Sign in with Google to get started. Your data will be stored in a Google Sheet in your Drive.</div>
   <div class="setup-card">
-    <div class="setup-field">
-      <label>Adafruit IO Username</label>
-      <input class="setup-input" id="setup-username" type="text" placeholder="e.g. mlehackett" autocomplete="off" autocapitalize="none">
-    </div>
-    <div class="setup-field">
-      <label>Adafruit IO Key</label>
-      <input class="setup-input" id="setup-key" type="text" placeholder="aio_xxxx…" autocomplete="off" autocapitalize="none">
-    </div>
     <div class="setup-field">
       <label>Default User for This Device</label>
       <select class="setup-input" id="setup-default-user">
@@ -34,8 +26,11 @@
         <option value="CYD">CYD</option>
       </select>
     </div>
-    <button class="setup-btn" onclick="saveSetup()">Get Started</button>
-    <div class="setup-error" id="setup-error">Please enter both your username and key.</div>
+    <button class="setup-btn google-btn" id="signin-btn" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;margin-right:8px"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      Sign in with Google
+    </button>
+    <div class="setup-error" id="setup-error"></div>
   </div>
 </div>
 
@@ -108,53 +103,38 @@
 
   <!-- SETTINGS TAB -->
   <div class="tab-content" id="tab-settings">
-    <div class="section-label">Adafruit IO</div>
+    <div class="section-label">Google Sheets</div>
     <div class="settings-group">
       <div class="settings-row">
-        <div class="settings-label">Username</div>
-        <input class="settings-input" id="s-username" type="text" autocapitalize="none" autocomplete="off">
+        <div class="settings-label">Spreadsheet</div>
+        <a class="settings-link" id="s-sheet-url" href="#" target="_blank">Not yet created</a>
       </div>
+      <div class="settings-note">To share with CYD: open the spreadsheet, click Share, and add his Google account with Editor access.</div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Default User</div>
+    <div class="settings-group">
       <div class="settings-row">
-        <div class="settings-label">API Key</div>
-        <input class="settings-input" id="s-apikey" type="text" autocapitalize="none" autocomplete="off">
-      </div>
-      <div class="settings-row">
-        <div class="settings-label">Default User (this device)</div>
+        <div class="settings-label">This device logs as</div>
         <select class="settings-input" id="s-default-user">
           <option value="MLE">MLE</option>
           <option value="CYD">CYD</option>
         </select>
       </div>
       <div class="settings-row">
-        <button class="settings-save" onclick="saveCredentials()">Save Credentials</button>
-      </div>
-      <div class="settings-note">Credentials are stored only on this device. The files in GitHub contain no credentials.</div>
-    </div>
-    <div class="section-label" style="margin-top:8px">Feed Groups</div>
-    <div class="settings-group">
-      <div class="settings-row">
-        <div class="settings-label">Chores</div>
-        <div class="settings-static">home-chore-log</div>
-      </div>
-      <div class="settings-row">
-        <div class="settings-label">Wildlife</div>
-        <div class="settings-static">home-wildlife-log</div>
-      </div>
-      <div class="settings-row">
-        <div class="settings-label">Diary</div>
-        <div class="settings-static">home-chore-log.diary-entries</div>
+        <button class="settings-save" onclick="saveSettings()">Save</button>
       </div>
     </div>
-    <div class="section-label" style="margin-top:8px">Users</div>
+    <div class="section-label" style="margin-top:8px">Account</div>
     <div class="settings-group">
       <div class="settings-row">
-        <div class="settings-label">Logged Users</div>
-        <div class="settings-static">MLE &amp; CYD</div>
+        <button class="settings-signout" onclick="handleSignOut()">Sign out of Google</button>
       </div>
     </div>
   </div>
 </div>
 
+<script src="auth.js"></script>
+<script src="sheets.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

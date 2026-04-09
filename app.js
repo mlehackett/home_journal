@@ -1,83 +1,78 @@
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const CHORE_GROUP    = "home-chore-log";
-const WILDLIFE_GROUP = "home-wildlife-log";
-const DIARY_FEED     = "home-chore-log.diary-entries";
-const QUANTITY_FEEDS = ["bags_of_salt"];
+const QUANTITY_CHORES = ["Bags of salt"]; // display names that need a qty input
 
-let AIO_USERNAME = "";
-let AIO_KEY      = "";
-let AIO_BASE     = "";
-let HEADERS      = {};
-
-let currentUser   = "MLE";
-let choreFeeds    = [];
-let wildlifeFeeds = [];
+let currentUser = "MLE";
+let choreList   = []; // [{name, isQty, qty, histOpen}]
+let speciesList = []; // [{name, histOpen}]
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  const storedUser    = localStorage.getItem("aio_username");
-  const storedKey     = localStorage.getItem("aio_key");
+  // Restore default user
   const storedDefault = localStorage.getItem("default_user");
   if (storedDefault) currentUser = storedDefault;
-  if (storedUser && storedKey) {
-    initApp(storedUser, storedKey);
+
+  if (isSignedIn()) {
+    showApp();
   } else {
     document.getElementById("setup-screen").classList.add("visible");
   }
 });
 
-function initApp(username, key) {
-  AIO_USERNAME = username;
-  AIO_KEY      = key;
-  AIO_BASE     = `https://io.adafruit.com/api/v2/${AIO_USERNAME}`;
-  HEADERS      = { "X-AIO-Key": AIO_KEY, "Content-Type": "application/json" };
-
+async function showApp() {
   document.getElementById("setup-screen").classList.remove("visible");
   document.getElementById("main-app").classList.add("visible");
-  document.getElementById("s-username").value = AIO_USERNAME;
-  document.getElementById("s-apikey").value   = AIO_KEY;
-  document.getElementById("s-default-user").value = currentUser;
 
-  // Reflect the current (possibly stored) default user in the header
+  // Reflect current user in header
   document.querySelectorAll(".user-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.user === currentUser));
 
-  loadChoreFeeds();
-  loadWildlifeFeeds();
+  // Populate settings
+  const url = localStorage.getItem("spreadsheet_url") || "";
+  document.getElementById("s-sheet-url").href        = url;
+  document.getElementById("s-sheet-url").textContent = url ? "Open spreadsheet" : "Not yet created";
+  document.getElementById("s-default-user").value    = currentUser;
+
+  await Promise.all([loadChores(), loadSpecies()]);
 }
 
-// ── SETUP ─────────────────────────────────────────────────────────────────────
-function saveSetup() {
-  const username    = document.getElementById("setup-username").value.trim();
-  const key         = document.getElementById("setup-key").value.trim();
-  const defaultUser = document.getElementById("setup-default-user").value;
-  const err         = document.getElementById("setup-error");
-  if (!username || !key) { err.classList.add("visible"); return; }
+// ── SETUP / AUTH ──────────────────────────────────────────────────────────────
+async function signIn() {
+  const btn = document.getElementById("signin-btn");
+  const err = document.getElementById("setup-error");
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
   err.classList.remove("visible");
-  localStorage.setItem("aio_username", username);
-  localStorage.setItem("aio_key", key);
-  localStorage.setItem("default_user", defaultUser);
-  currentUser = defaultUser;
-  initApp(username, key);
+
+  try {
+    const defaultUser = document.getElementById("setup-default-user").value;
+    localStorage.setItem("default_user", defaultUser);
+    currentUser = defaultUser;
+
+    await getAccessToken();
+    // Trigger spreadsheet creation on first sign-in
+    await getOrCreateSpreadsheet();
+    showApp();
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add("visible");
+    btn.disabled = false;
+    btn.textContent = "Sign in with Google";
+  }
 }
 
-function saveCredentials() {
-  const username    = document.getElementById("s-username").value.trim();
-  const key         = document.getElementById("s-apikey").value.trim();
-  const defaultUser = document.getElementById("s-default-user").value;
-  if (!username || !key) return;
-  localStorage.setItem("aio_username", username);
-  localStorage.setItem("aio_key", key);
-  localStorage.setItem("default_user", defaultUser);
-  currentUser = defaultUser;
-  initApp(username, key);
-  setChoreStatus("ok", "Credentials saved. Reloading…");
+function handleSignOut() {
+  signOut();
+  document.getElementById("main-app").classList.remove("visible");
+  document.getElementById("setup-screen").classList.add("visible");
+  choreList   = [];
+  speciesList = [];
 }
 
 // ── USER & TABS ───────────────────────────────────────────────────────────────
 function setUser(u) {
   currentUser = u;
-  document.querySelectorAll(".user-btn").forEach(b => b.classList.toggle("active", b.dataset.user === u));
+  document.querySelectorAll(".user-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.user === u));
 }
 
 function showTab(name, e) {
@@ -87,64 +82,47 @@ function showTab(name, e) {
   if (e && e.currentTarget) e.currentTarget.classList.add("active");
 }
 
-// ── NAME HELPERS ──────────────────────────────────────────────────────────────
-function feedKeyToDisplay(key) {
-  const words = key.split("_");
-  words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1);
-  return words.join(" ");
-}
-
-function displayToFeedKey(name) {
-  return name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-}
-
-// ── VALUE ENCODING ────────────────────────────────────────────────────────────
-function encodeValue(user, quantity) { return `${user}:${quantity}`; }
-
-function decodeValue(raw) {
-  if (!raw) return { user: "—", quantity: "?" };
-  const colon = raw.indexOf(":");
-  if (colon === -1) return { user: "—", quantity: raw };
-  return { user: raw.substring(0, colon), quantity: raw.substring(colon + 1) };
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function saveSettings() {
+  const defaultUser = document.getElementById("s-default-user").value;
+  localStorage.setItem("default_user", defaultUser);
+  currentUser = defaultUser;
+  document.querySelectorAll(".user-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.user === currentUser));
+  setChoreStatus("ok", "Settings saved.");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHORES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function loadChoreFeeds() {
-  setChoreStatus("loading", "Loading chores from Adafruit IO…");
+async function loadChores() {
+  setChoreStatus("loading", "Loading chores…");
   try {
-    const res = await fetch(`${AIO_BASE}/groups/${CHORE_GROUP}`, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    const CHORE_EXCLUDE = ["diary_entries"];
-    choreFeeds = (data.feeds || [])
-      .filter(f => !CHORE_EXCLUDE.includes(f.key.split(".").pop().replace(/-/g, "_")))
-      .map(f => {
-        const shortKey = f.key.split(".").pop().replace(/-/g, "_");
-        return { key: f.key, shortKey, displayName: feedKeyToDisplay(shortKey),
-                 isQty: QUANTITY_FEEDS.includes(shortKey), qty: 3, histOpen: false };
-      });
-
-    setChoreStatus("ok", choreFeeds.length === 0
-      ? "No feeds found yet. Add one below!"
-      : `${choreFeeds.length} chore${choreFeeds.length !== 1 ? "s" : ""} loaded.`);
+    const names = await getUniqueChores();
+    choreList = names.map(name => ({
+      name,
+      isQty: QUANTITY_CHORES.includes(name),
+      qty: 3,
+      histOpen: false
+    }));
+    setChoreStatus("ok", choreList.length === 0
+      ? "No chores yet — add one below!"
+      : `${choreList.length} chore${choreList.length !== 1 ? "s" : ""} loaded.`);
     renderChores();
   } catch (e) {
-    setChoreStatus("error", "Could not load feeds: " + e.message);
+    setChoreStatus("error", "Could not load chores: " + e.message);
   }
 }
 
 function renderChores() {
   const grid = document.getElementById("chore-grid");
   grid.innerHTML = "";
-  if (choreFeeds.length === 0) {
+  if (choreList.length === 0) {
     grid.innerHTML = `<div class="empty-state">No chores yet — add one below!</div>`;
     return;
   }
-  choreFeeds.forEach((chore, i) => {
+  choreList.forEach((chore, i) => {
     const card = document.createElement("div");
     card.className = "chore-card";
     card.id = `chore-card-${i}`;
@@ -159,7 +137,7 @@ function renderChores() {
     card.innerHTML = `
       <div class="chore-row">
         <div style="flex:1;cursor:${chore.isQty ? "default" : "pointer"}" onclick="${chore.isQty ? "" : `logChore(${i})`}">
-          <div class="chore-name">${chore.displayName}</div>
+          <div class="chore-name">${chore.name}</div>
           <span class="chore-tap">${chore.isQty ? "Set qty, then tap ✓" : "Tap to log"}</span>
         </div>
         <div class="chore-action">
@@ -174,25 +152,21 @@ function renderChores() {
 }
 
 function changeChoreQty(i, delta) {
-  choreFeeds[i].qty = Math.max(1, choreFeeds[i].qty + delta);
-  document.getElementById(`chore-qty-${i}`).textContent = choreFeeds[i].qty;
+  choreList[i].qty = Math.max(1, choreList[i].qty + delta);
+  document.getElementById(`chore-qty-${i}`).textContent = choreList[i].qty;
 }
 
 async function logChore(i) {
-  const chore = choreFeeds[i];
+  const chore = choreList[i];
   const card  = document.getElementById(`chore-card-${i}`);
   if (card.classList.contains("logging")) return;
   card.classList.add("logging");
   const quantity = chore.isQty ? chore.qty : 1;
   try {
-    const res = await fetch(`${AIO_BASE}/feeds/${chore.key}/data`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ value: encodeValue(currentUser, quantity) })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await appendChore(currentUser, chore.name, quantity);
     card.classList.remove("logging");
     card.classList.add("success");
-    setChoreStatus("ok", `Logged: ${chore.displayName} (${quantity}) by ${currentUser}`);
+    setChoreStatus("ok", `Logged: ${chore.name} (${quantity}) by ${currentUser}`);
     setTimeout(() => card.classList.remove("success"), 2000);
     if (chore.histOpen) fetchChoreHistory(i);
   } catch (e) {
@@ -202,7 +176,7 @@ async function logChore(i) {
 }
 
 function toggleChoreHistory(i) {
-  const chore = choreFeeds[i];
+  const chore = choreList[i];
   const panel = document.getElementById(`chore-hist-${i}`);
   const btn   = document.getElementById(`chore-histbtn-${i}`);
   chore.histOpen = !chore.histOpen;
@@ -212,23 +186,20 @@ function toggleChoreHistory(i) {
 }
 
 async function fetchChoreHistory(i) {
-  const chore = choreFeeds[i];
+  const chore = choreList[i];
   const panel = document.getElementById(`chore-hist-${i}`);
   panel.innerHTML = `<div class="hist-loading"><span class="spin">↺</span>&nbsp;Loading…</div>`;
   try {
-    const res = await fetch(`${AIO_BASE}/feeds/${chore.key}/data?limit=15`, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = await res.json();
-    if (!items || items.length === 0) { panel.innerHTML = `<div class="hist-empty">No entries yet.</div>`; return; }
-    panel.innerHTML = items.map(item => {
-      const { user, quantity } = decodeValue(item.value);
-      return `<div class="hist-item">
+    const all  = await readChores();
+    const rows = all.filter(r => r.chore === chore.name);
+    if (rows.length === 0) { panel.innerHTML = `<div class="hist-empty">No entries yet.</div>`; return; }
+    panel.innerHTML = rows.map(r => `
+      <div class="hist-item">
         <div class="hist-dot"></div>
-        <div class="hist-date">${formatDate(new Date(item.created_at))}</div>
-        ${user !== "—" ? `<span class="hist-user">${user}</span>` : ""}
-        <span class="hist-val">${quantity}</span>
-      </div>`;
-    }).join("");
+        <div class="hist-date">${formatTimestamp(r.timestamp)}</div>
+        ${r.user ? `<span class="hist-user">${r.user}</span>` : ""}
+        <span class="hist-val">${r.quantity}</span>
+      </div>`).join("");
   } catch (e) {
     panel.innerHTML = `<div class="hist-empty">Error: ${e.message}</div>`;
   }
@@ -240,25 +211,12 @@ async function logOtherChore() {
   const name   = input.value.trim();
   if (!name) return;
   submit.disabled = true; submit.textContent = "…";
-  const shortKey   = displayToFeedKey(name);
-  const aioFeedKey = `${CHORE_GROUP}.${shortKey.replace(/_/g, "-")}`;
-  setChoreStatus("loading", `Creating feed "${name}"…`);
+  setChoreStatus("loading", `Logging "${name}"…`);
   try {
-    const createRes = await fetch(`${AIO_BASE}/groups/${CHORE_GROUP}/feeds`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ feed: { name, key: shortKey.replace(/_/g, "-") } })
-    });
-    if (!createRes.ok && createRes.status !== 422) throw new Error(`Create feed HTTP ${createRes.status}`);
-    const feedData    = createRes.ok ? await createRes.json() : null;
-    const resolvedKey = feedData ? feedData.key : aioFeedKey;
-    const logRes = await fetch(`${AIO_BASE}/feeds/${resolvedKey}/data`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ value: encodeValue(currentUser, 1) })
-    });
-    if (!logRes.ok) throw new Error(`Log HTTP ${logRes.status}`);
+    await appendChore(currentUser, name, 1);
     setChoreStatus("ok", `Logged: ${name} by ${currentUser}. Refreshing…`);
     input.value = "";
-    await loadChoreFeeds();
+    await loadChores();
   } catch (e) {
     setChoreStatus("error", "Error: " + e.message);
   } finally {
@@ -275,42 +233,35 @@ function setChoreStatus(state, msg) {
 // WILDLIFE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function loadWildlifeFeeds() {
-  setWildlifeStatus("loading", "Loading species from Adafruit IO…");
+async function loadSpecies() {
+  setWildlifeStatus("loading", "Loading species…");
   try {
-    const res = await fetch(`${AIO_BASE}/groups/${WILDLIFE_GROUP}`, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    wildlifeFeeds = (data.feeds || []).map(f => {
-      const shortKey = f.key.split(".").pop().replace(/-/g, "_");
-      return { key: f.key, shortKey, displayName: feedKeyToDisplay(shortKey), histOpen: false };
-    });
-
-    setWildlifeStatus("ok", wildlifeFeeds.length === 0
+    const names = await getUniqueSpecies();
+    speciesList = names.map(name => ({ name, histOpen: false }));
+    setWildlifeStatus("ok", speciesList.length === 0
       ? "No species yet — add one below!"
-      : `${wildlifeFeeds.length} species loaded.`);
+      : `${speciesList.length} species loaded.`);
     renderWildlife();
   } catch (e) {
-    setWildlifeStatus("error", "Could not load feeds: " + e.message);
+    setWildlifeStatus("error", "Could not load species: " + e.message);
   }
 }
 
 function renderWildlife() {
   const grid = document.getElementById("wildlife-grid");
   grid.innerHTML = "";
-  if (wildlifeFeeds.length === 0) {
+  if (speciesList.length === 0) {
     grid.innerHTML = `<div class="empty-state">No species yet — add one below!</div>`;
     return;
   }
-  wildlifeFeeds.forEach((species, i) => {
+  speciesList.forEach((species, i) => {
     const card = document.createElement("div");
     card.className = "chore-card";
     card.id = `wildlife-card-${i}`;
     card.innerHTML = `
       <div class="chore-row">
         <div style="flex:1;cursor:pointer" onclick="logWildlife(${i})">
-          <div class="chore-name">${species.displayName}</div>
+          <div class="chore-name">${species.name}</div>
           <span class="chore-tap">Tap to log sighting</span>
         </div>
         <div class="chore-action">
@@ -324,19 +275,15 @@ function renderWildlife() {
 }
 
 async function logWildlife(i) {
-  const species = wildlifeFeeds[i];
+  const species = speciesList[i];
   const card    = document.getElementById(`wildlife-card-${i}`);
   if (card.classList.contains("logging")) return;
   card.classList.add("logging");
   try {
-    const res = await fetch(`${AIO_BASE}/feeds/${species.key}/data`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ value: encodeValue(currentUser, 1) })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await appendWildlife(currentUser, species.name);
     card.classList.remove("logging");
     card.classList.add("success");
-    setWildlifeStatus("ok", `Logged: ${species.displayName} by ${currentUser}`);
+    setWildlifeStatus("ok", `Logged: ${species.name} by ${currentUser}`);
     setTimeout(() => card.classList.remove("success"), 2000);
     if (species.histOpen) fetchWildlifeHistory(i);
   } catch (e) {
@@ -346,7 +293,7 @@ async function logWildlife(i) {
 }
 
 function toggleWildlifeHistory(i) {
-  const species = wildlifeFeeds[i];
+  const species = speciesList[i];
   const panel   = document.getElementById(`wildlife-hist-${i}`);
   const btn     = document.getElementById(`wildlife-histbtn-${i}`);
   species.histOpen = !species.histOpen;
@@ -356,35 +303,29 @@ function toggleWildlifeHistory(i) {
 }
 
 async function fetchWildlifeHistory(i) {
-  const species = wildlifeFeeds[i];
+  const species = speciesList[i];
   const panel   = document.getElementById(`wildlife-hist-${i}`);
   panel.innerHTML = `<div class="hist-loading"><span class="spin">↺</span>&nbsp;Loading…</div>`;
   try {
-    const res = await fetch(`${AIO_BASE}/feeds/${species.key}/data?limit=100`, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = await res.json();
-    if (!items || items.length === 0) { panel.innerHTML = `<div class="hist-empty">No sightings yet.</div>`; return; }
+    const all  = await readWildlife();
+    const rows = all.filter(r => r.species === species.name);
+    if (rows.length === 0) { panel.innerHTML = `<div class="hist-empty">No sightings yet.</div>`; return; }
 
     // Aggregate by day
     const byDay = {};
-    items.forEach(item => {
-      const d   = new Date(item.created_at);
-      const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-      if (!byDay[day]) byDay[day] = { count: 0, users: new Set(), date: d };
-      const { user } = decodeValue(item.value);
+    rows.forEach(r => {
+      const day = r.timestamp.split(",")[0].trim();
+      if (!byDay[day]) byDay[day] = { count: 0, users: new Set(), raw: r.timestamp };
       byDay[day].count++;
-      if (user !== "—") byDay[day].users.add(user);
+      if (r.user) byDay[day].users.add(r.user);
     });
 
-    // Sort days newest first
-    const days = Object.entries(byDay).sort((a, b) => b[1].date - a[1].date);
-
-    panel.innerHTML = days.map(([day, info]) => {
-      const userBadges = [...info.users].map(u => `<span class="hist-user">${u}</span>`).join(" ");
+    panel.innerHTML = Object.entries(byDay).map(([day, info]) => {
+      const badges = [...info.users].map(u => `<span class="hist-user">${u}</span>`).join(" ");
       return `<div class="hist-item">
         <div class="hist-dot"></div>
         <div class="hist-date">${day}</div>
-        ${userBadges}
+        ${badges}
         <span class="hist-val">${info.count}×</span>
       </div>`;
     }).join("");
@@ -399,25 +340,12 @@ async function logOtherWildlife() {
   const name   = input.value.trim();
   if (!name) return;
   submit.disabled = true; submit.textContent = "…";
-  const shortKey   = displayToFeedKey(name);
-  const aioFeedKey = `${WILDLIFE_GROUP}.${shortKey.replace(/_/g, "-")}`;
-  setWildlifeStatus("loading", `Creating feed "${name}"…`);
+  setWildlifeStatus("loading", `Logging "${name}"…`);
   try {
-    const createRes = await fetch(`${AIO_BASE}/groups/${WILDLIFE_GROUP}/feeds`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ feed: { name, key: shortKey.replace(/_/g, "-") } })
-    });
-    if (!createRes.ok && createRes.status !== 422) throw new Error(`Create feed HTTP ${createRes.status}`);
-    const feedData    = createRes.ok ? await createRes.json() : null;
-    const resolvedKey = feedData ? feedData.key : aioFeedKey;
-    const logRes = await fetch(`${AIO_BASE}/feeds/${resolvedKey}/data`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ value: encodeValue(currentUser, 1) })
-    });
-    if (!logRes.ok) throw new Error(`Log HTTP ${logRes.status}`);
+    await appendWildlife(currentUser, name);
     setWildlifeStatus("ok", `Logged: ${name} by ${currentUser}. Refreshing…`);
     input.value = "";
-    await loadWildlifeFeeds();
+    await loadSpecies();
   } catch (e) {
     setWildlifeStatus("error", "Error: " + e.message);
   } finally {
@@ -438,19 +366,11 @@ async function submitDiaryEntry() {
   const textarea = document.getElementById("diary-text");
   const text     = textarea.value.trim();
   if (!text) return;
-
   setDiaryStatus("loading", "Saving entry…");
   try {
-    // Store as "USER:text" — reuse same encoding convention
-    const value = encodeValue(currentUser, text);
-    const res = await fetch(`${AIO_BASE}/feeds/${DIARY_FEED}/data`, {
-      method: "POST", headers: HEADERS,
-      body: JSON.stringify({ value })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await appendDiary(currentUser, text);
     textarea.value = "";
     setDiaryStatus("ok", "Entry saved!");
-    // Refresh list if already loaded
     const list = document.getElementById("diary-list");
     if (list.children.length > 0) loadDiaryEntries();
   } catch (e) {
@@ -463,37 +383,26 @@ async function loadDiaryEntries() {
   btn.textContent = "↺ Loading…";
   setDiaryStatus("loading", "Loading entries…");
   try {
-    const res = await fetch(`${AIO_BASE}/feeds/${DIARY_FEED}/data?limit=100`, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = await res.json();
-
+    const rows = await readDiary();
     const list = document.getElementById("diary-list");
-    if (!items || items.length === 0) {
+    if (rows.length === 0) {
       list.innerHTML = `<div class="empty-state">No entries yet.</div>`;
       setDiaryStatus("ok", "No entries yet.");
       return;
     }
-
-    list.innerHTML = items.map((item, idx) => {
-      const { user, quantity: text } = decodeValue(item.value);
-      const date = new Date(item.created_at);
-      const dateStr = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-      const timeStr = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-      return `
-        <div class="diary-entry" id="diary-entry-${idx}">
-          <div class="diary-entry-header" onclick="toggleDiaryEntry(${idx})">
-            <div class="diary-entry-meta">
-              <span class="diary-entry-date">${dateStr}, ${timeStr}</span>
-              ${user !== "—" ? `<span class="hist-user">${user}</span>` : ""}
-            </div>
-            <span class="diary-entry-preview" id="diary-preview-${idx}">${text.substring(0, 60)}${text.length > 60 ? "…" : ""}</span>
-            <span class="diary-chevron" id="diary-chevron-${idx}">›</span>
+    list.innerHTML = rows.map((row, idx) => `
+      <div class="diary-entry" id="diary-entry-${idx}">
+        <div class="diary-entry-header" onclick="toggleDiaryEntry(${idx})">
+          <div class="diary-entry-meta">
+            <span class="diary-entry-date">${row.timestamp}</span>
+            ${row.user ? `<span class="hist-user">${row.user}</span>` : ""}
           </div>
-          <div class="diary-entry-body" id="diary-body-${idx}">${text.replace(/\n/g, "<br>")}</div>
-        </div>`;
-    }).join("");
-
-    setDiaryStatus("ok", `${items.length} entr${items.length !== 1 ? "ies" : "y"} loaded.`);
+          <span class="diary-entry-preview" id="diary-preview-${idx}">${row.entry.substring(0, 60)}${row.entry.length > 60 ? "…" : ""}</span>
+          <span class="diary-chevron" id="diary-chevron-${idx}">›</span>
+        </div>
+        <div class="diary-entry-body" id="diary-body-${idx}">${row.entry.replace(/\n/g, "<br>")}</div>
+      </div>`).join("");
+    setDiaryStatus("ok", `${rows.length} entr${rows.length !== 1 ? "ies" : "y"} loaded.`);
   } catch (e) {
     setDiaryStatus("error", "Failed to load: " + e.message);
   } finally {
@@ -516,11 +425,14 @@ function setDiaryStatus(state, msg) {
 }
 
 // ── SHARED HELPERS ────────────────────────────────────────────────────────────
-function formatDate(d) {
+function formatTimestamp(ts) {
+  if (!ts) return "—";
+  const d    = new Date(ts);
   const diff = Math.floor((Date.now() - d) / 1000);
+  if (isNaN(diff)) return ts; // fallback if parse fails
   if (diff < 60)     return "Just now";
   if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return ts.split(",")[0]; // just the date portion
 }

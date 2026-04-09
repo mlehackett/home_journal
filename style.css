@@ -62,17 +62,32 @@ body {
   outline: none; transition: border-color 0.2s; width: 100%;
 }
 .setup-input:focus { border-color: var(--accent); }
-select.setup-input, select.settings-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A7178' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+select.setup-input, select.settings-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A7178' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
 
 .setup-btn {
   font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
   padding: 13px; border-radius: 10px; border: none;
   background: var(--accent); color: white; cursor: pointer;
-  transition: background 0.2s; width: 100%;
+  transition: background 0.2s; width: 100%; text-align: center;
 }
 .setup-btn:active { background: #147a85; }
+.setup-btn:disabled { background: var(--border); color: var(--ink2); cursor: default; }
 
-.setup-error { font-size: 13px; color: var(--red); text-align: center; display: none; }
+.google-btn {
+  background: white; color: #444; border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.google-btn:active { background: var(--bg); }
+.google-btn:disabled { opacity: 0.6; }
+
+.setup-error { font-size: 13px; color: var(--red); text-align: center; display: none; line-height: 1.5; }
 .setup-error.visible { display: block; }
 
 /* ── MAIN APP ──────────────────────────────────────────────────────────────── */
@@ -268,35 +283,23 @@ select.setup-input, select.settings-input { appearance: none; background-image: 
 .diary-entry-header {
   padding: 14px 16px; cursor: pointer;
   display: flex; flex-direction: column; gap: 4px;
-  transition: background 0.15s;
-  position: relative;
+  transition: background 0.15s; position: relative;
 }
 .diary-entry-header:active { background: var(--surface2); }
 
-.diary-entry-meta {
-  display: flex; align-items: center; gap: 8px;
-}
-
+.diary-entry-meta { display: flex; align-items: center; gap: 8px; }
 .diary-entry-date { font-size: 12px; color: var(--ink2); flex: 1; }
-
-.diary-entry-preview {
-  font-size: 14px; color: var(--ink); line-height: 1.4;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.diary-entry-preview { font-size: 14px; color: var(--ink); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .diary-chevron {
-  position: absolute; right: 16px; top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px; color: var(--ink2);
-  transition: transform 0.2s;
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; color: var(--ink2); transition: transform 0.2s;
 }
 
 .diary-entry-body {
-  display: none;
-  padding: 0 16px 16px;
+  display: none; padding: 14px 16px;
   font-size: 15px; line-height: 1.7; color: var(--ink);
   border-top: 1px solid var(--border);
-  padding-top: 14px;
 }
 .diary-entry-body.open { display: block; }
 
@@ -321,6 +324,19 @@ select.setup-input, select.settings-input { appearance: none; background-image: 
   transition: background 0.2s; width: 100%;
 }
 .settings-save:active { background: #147a85; }
+
+.settings-signout {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  padding: 11px; border-radius: 10px;
+  border: 1.5px solid var(--red); background: transparent; color: var(--red);
+  cursor: pointer; transition: all 0.2s; width: 100%;
+}
+.settings-signout:active { background: var(--red); color: white; }
+
+.settings-link {
+  font-size: 14px; color: var(--accent); text-decoration: none;
+}
+.settings-link:hover { text-decoration: underline; }
 
 .settings-note { font-size: 13px; color: var(--ink2); line-height: 1.5; padding: 12px 16px; background: var(--green-light); border-top: 1px solid var(--border); }
 .settings-static { font-size: 14px; color: var(--ink); padding: 4px 0; }
