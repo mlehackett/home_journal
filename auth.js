@@ -1,51 +1,43 @@
-// ── GOOGLE OAUTH ──────────────────────────────────────────────────────────────
-// Uses redirect flow — redirects to Google, then back to this page.
-// Token is extracted from the URL hash on return and stored in localStorage.
+// ── GOOGLE IDENTITY SERVICES (GIS) AUTH ───────────────────────────────────────
+// Uses Google's modern token client — no redirect URI needed, no implicit flow.
+// The GIS library is loaded via a script tag in index.html.
 
 const GOOGLE_CLIENT_ID = "1042216799322-nejjr34u08ugkdkb5vdmqlk7mdsg7prd.apps.googleusercontent.com";
 const GOOGLE_SCOPES    = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file";
 
 let _accessToken    = null;
 let _tokenExpiresAt = 0;
-
-// ── INIT: CHECK FOR TOKEN IN URL HASH ON PAGE LOAD ────────────────────────────
-// Call this early — if we're returning from Google, the token is in the hash.
-(function extractTokenFromHash() {
-  if (!window.location.hash) return;
-  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  const token     = params.get("access_token");
-  const expiresIn = parseInt(params.get("expires_in") || "0", 10);
-  const state     = params.get("state");
-
-  if (!token) return;
-
-  // Validate state to prevent CSRF
-  const savedState = sessionStorage.getItem("oauth_state");
-  if (state && savedState && state !== savedState) {
-    console.error("OAuth state mismatch");
-    return;
-  }
-  sessionStorage.removeItem("oauth_state");
-
-  const expiresAt = Date.now() + expiresIn * 1000;
-  _accessToken    = token;
-  _tokenExpiresAt = expiresAt;
-  localStorage.setItem("google_token",         token);
-  localStorage.setItem("google_token_expires", expiresAt.toString());
-
-  // Clean the hash from the URL without reloading
-  history.replaceState(null, "", window.location.pathname);
-})();
+let _tokenClient    = null;
 
 // ── PUBLIC API ────────────────────────────────────────────────────────────────
 
-async function getAccessToken() {
-  if (_accessToken && Date.now() < _tokenExpiresAt - 60000) return _accessToken;
-  const stored = _loadStoredToken();
-  if (stored) return stored;
-  // Need to redirect to Google — this won't return
-  _redirectToGoogle();
-  return new Promise(() => {}); // never resolves — page is redirecting
+// Returns a valid access token, prompting via GIS popup if needed.
+function getAccessToken() {
+  return new Promise((resolve, reject) => {
+    // Return cached token if still valid
+    if (_accessToken && Date.now() < _tokenExpiresAt - 60000) {
+      resolve(_accessToken);
+      return;
+    }
+    // Try localStorage
+    const stored = _loadStoredToken();
+    if (stored) { resolve(stored); return; }
+
+    // Need to prompt via GIS
+    _ensureTokenClient((err) => {
+      if (err) { reject(err); return; }
+      _tokenClient.callback = (response) => {
+        if (response.error) { reject(new Error(response.error)); return; }
+        const expiresAt = Date.now() + (response.expires_in * 1000);
+        _accessToken    = response.access_token;
+        _tokenExpiresAt = expiresAt;
+        localStorage.setItem("google_token",         response.access_token);
+        localStorage.setItem("google_token_expires", expiresAt.toString());
+        resolve(response.access_token);
+      };
+      _tokenClient.requestAccessToken({ prompt: "select_account" });
+    });
+  });
 }
 
 function isSignedIn() {
@@ -54,6 +46,9 @@ function isSignedIn() {
 }
 
 function signOut() {
+  if (_accessToken) {
+    try { google.accounts.oauth2.revoke(_accessToken); } catch(e) {}
+  }
   _accessToken    = null;
   _tokenExpiresAt = 0;
   localStorage.removeItem("google_token");
@@ -73,19 +68,25 @@ function _loadStoredToken() {
   return null;
 }
 
-function _redirectToGoogle() {
-  const state = Math.random().toString(36).substring(2);
-  sessionStorage.setItem("oauth_state", state);
-
-  const redirect = window.location.origin + window.location.pathname;
-  const params   = new URLSearchParams({
-    client_id:     GOOGLE_CLIENT_ID,
-    redirect_uri:  redirect,
-    response_type: "token",
-    scope:         GOOGLE_SCOPES,
-    state:         state,
-    prompt:        "select_account"
-  });
-
-  window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+function _ensureTokenClient(callback) {
+  // Wait for GIS library to load
+  const maxWait = 5000;
+  const start   = Date.now();
+  const check   = () => {
+    if (typeof google !== "undefined" && google.accounts && google.accounts.oauth2) {
+      if (!_tokenClient) {
+        _tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope:     GOOGLE_SCOPES,
+          callback:  () => {} // set per-call
+        });
+      }
+      callback(null);
+    } else if (Date.now() - start > maxWait) {
+      callback(new Error("Google Identity Services failed to load."));
+    } else {
+      setTimeout(check, 100);
+    }
+  };
+  check();
 }
