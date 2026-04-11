@@ -157,9 +157,16 @@ async function getUniqueChores() {
 }
 
 async function getUniqueSpecies() {
-  const rows = await _readSheet(SHEET_WILDLIFE, "C2:C");
-  const names = [...new Set((rows || []).map(r => r[0]).filter(Boolean))].sort();
-  return names;
+  const rows = await _readSheet(SHEET_WILDLIFE, "B2:C");
+  const lastSeen = new Map();
+  for (const row of rows) {
+    const existing = lastSeen.get(row[1]); // row[1] = species name
+    if (!existing || new Date(row[0]) > new Date(existing)) {
+      lastSeen.set(row[1], new Date(row[0])); // row[0] = timestamp
+    }
+  }
+  const sorted = [...lastSeen.entries()].sort((a, b) => b[1] - a[1]);
+  return sorted.map(entry => entry[0]);
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
