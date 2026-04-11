@@ -165,7 +165,7 @@ async function getUniqueSpecies() {
       lastSeen.set(row[1], new Date(row[0])); // row[0] = timestamp
     }
   }
-  const sorted = [...lastSeen.entries()].sort((a, b) => b[1] - a[1]);
+  const sorted = [...lastSeen.entries()].sort((a, b) => a[1] - b[1]);
   return sorted.map(entry => entry[0]);
 }
 
