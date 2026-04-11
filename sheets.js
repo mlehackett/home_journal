@@ -12,18 +12,40 @@ const SHEET_DIARY    = "Diary";
 
 // ── SPREADSHEET INIT ──────────────────────────────────────────────────────────
 
-// Returns the spreadsheet ID, creating it if needed.
+// Returns the spreadsheet ID, finding existing or creating new.
 let _creatingSpreadsheet = null; // promise lock
 
 async function getOrCreateSpreadsheet() {
   // Check localStorage first
   const stored = localStorage.getItem("spreadsheet_id");
   if (stored) return stored;
-  // If already creating, wait for that to finish
+  // If already in progress, wait for it
   if (_creatingSpreadsheet) return await _creatingSpreadsheet;
-  // Start creation and lock
-  _creatingSpreadsheet = createSpreadsheet().finally(() => { _creatingSpreadsheet = null; });
+  // Search Drive for existing sheet, then create if not found
+  _creatingSpreadsheet = _findOrCreateSpreadsheet().finally(() => { _creatingSpreadsheet = null; });
   return await _creatingSpreadsheet;
+}
+
+async function _findOrCreateSpreadsheet() {
+  const token = await getAccessToken();
+  // Search for an existing "Home Journal" spreadsheet created by this app
+  const query = encodeURIComponent(`name='${SPREADSHEET_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`);
+  const res   = await fetch(`${DRIVE_API}?q=${query}&fields=files(id,name)`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Drive search HTTP ${res.status}`);
+  const data  = await res.json();
+  const files = data.files || [];
+
+  if (files.length > 0) {
+    // Use the first match (most likely the one we created)
+    const id = files[0].id;
+    localStorage.setItem("spreadsheet_id", id);
+    localStorage.setItem("spreadsheet_url", `https://docs.google.com/spreadsheets/d/${id}`);
+    return id;
+  }
+  // Nothing found — create fresh
+  return await createSpreadsheet();
 }
 
 async function createSpreadsheet() {
