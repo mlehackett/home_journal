@@ -129,7 +129,7 @@ async function readWildlife() {
   const rows = await _readSheet(SHEET_WILDLIFE, "A2:C");
   return (rows || []).map(r => ({
     timestamp: r[0] || "", user: r[1] || "", species: r[2] || ""
-  })).reverse();
+  }));
 }
 
 // Returns all diary rows as [{timestamp, user, entry}]
