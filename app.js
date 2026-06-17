@@ -1,4 +1,20 @@
 // ── CONFIG ────────────────────────────────────────────────────────────────────
+// Defaults for Home Journal. Override via window.APP_CONFIG before this loads.
+const APP_CONFIG = window.APP_CONFIG ?? {
+  appName:       "Home Journal",
+  storagePrefix: "",
+  tabs: [
+    { id: "wildlife", type: "wildlife"  },
+    { id: "log",      type: "chores"   },
+    { id: "diary",    type: "freeform", sheetName: "Diary", placeholder: "What's on your mind?" },
+    { id: "settings", type: "settings" }
+  ]
+};
+
+const _pfx            = APP_CONFIG.storagePrefix;
+const STORAGE_USER    = _pfx ? `${_pfx}_defaultUser`  : "default_user";
+const STORAGE_SHEET_URL = _pfx ? `${_pfx}_url` : "spreadsheet_url";
+
 const QUANTITY_CHORES = ["bags of salt"]; // lowercase - matched case-insensitively
 
 let currentUser = "MLE";
@@ -7,8 +23,7 @@ let speciesList = []; // [{name, histOpen}]
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  // Restore default user
-  const storedDefault = localStorage.getItem("default_user");
+  const storedDefault = localStorage.getItem(STORAGE_USER);
   if (storedDefault) currentUser = storedDefault;
 
   if (isSignedIn()) {
@@ -22,17 +37,27 @@ async function showApp() {
   document.getElementById("setup-screen").classList.remove("visible");
   document.getElementById("main-app").classList.add("visible");
 
-  // Reflect current user in header
   document.querySelectorAll(".user-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.user === currentUser));
 
-  // Populate settings
-  const url = localStorage.getItem("spreadsheet_url") || "";
-  document.getElementById("s-sheet-url").href        = url;
-  document.getElementById("s-sheet-url").textContent = url ? "Open spreadsheet" : "Not yet created";
-  document.getElementById("s-default-user").value    = currentUser;
+  const url = localStorage.getItem(STORAGE_SHEET_URL) || "";
+  const linkEl = document.getElementById("s-sheet-url");
+  if (linkEl) {
+    linkEl.href        = url;
+    linkEl.textContent = url ? "Open spreadsheet" : "Not yet created";
+  }
+  const defUserEl = document.getElementById("s-default-user");
+  if (defUserEl) defUserEl.value = currentUser;
 
-  await Promise.all([loadChores(), loadSpecies()]);
+  // Load each tab according to its type
+  const loads = APP_CONFIG.tabs
+    .filter(t => t.type === "chores")
+    .map(() => loadChores());
+  APP_CONFIG.tabs
+    .filter(t => t.type === "wildlife")
+    .forEach(() => loads.push(loadSpecies()));
+
+  await Promise.all(loads);
 }
 
 // ── SETUP / AUTH ──────────────────────────────────────────────────────────────
@@ -45,11 +70,10 @@ async function signIn() {
 
   try {
     const defaultUser = document.getElementById("setup-default-user").value;
-    localStorage.setItem("default_user", defaultUser);
+    localStorage.setItem(STORAGE_USER, defaultUser);
     currentUser = defaultUser;
 
     await getAccessToken();
-    // Trigger spreadsheet creation on first sign-in
     await getOrCreateSpreadsheet();
     showApp();
   } catch (e) {
@@ -85,12 +109,139 @@ function showTab(name, e) {
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function saveSettings() {
   const defaultUser = document.getElementById("s-default-user").value;
-  localStorage.setItem("default_user", defaultUser);
+  localStorage.setItem(STORAGE_USER, defaultUser);
   currentUser = defaultUser;
   document.querySelectorAll(".user-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.user === currentUser));
-  setChoreStatus("ok", "Settings saved.");
+  // Show confirmation on whichever status indicator is available
+  const dotEl  = document.getElementById("status-dot")  || document.getElementById("trips-status-dot");
+  const textEl = document.getElementById("status-text") || document.getElementById("trips-status-text");
+  if (dotEl)  dotEl.className    = "status-dot ok";
+  if (textEl) textEl.textContent = "Settings saved.";
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FREEFORM TABS  (Diary / Trips / Maintenance — any tab with type:"freeform")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Called from HTML: submitFreeformEntry('diary') / submitFreeformEntry('trips') etc.
+async function submitFreeformEntry(tabId) {
+  const tabCfg   = APP_CONFIG.tabs.find(t => t.id === tabId);
+  const sheetName = tabCfg ? tabCfg.sheetName : _capitalise(tabId);
+
+  const textarea = document.getElementById(tabId + "-text");
+  const text     = textarea.value.trim();
+  if (!text) return;
+
+  _setTabStatus(tabId, "loading", "Saving entry…");
+  try {
+    await _appendFreeformRow(sheetName, currentUser, text);
+    textarea.value = "";
+    _setTabStatus(tabId, "ok", "Entry saved!");
+    // Reload list if it's already been opened
+    const list = document.getElementById(tabId + "-list");
+    if (list && list.children.length > 0) loadFreeformEntries(tabId);
+  } catch (e) {
+    _setTabStatus(tabId, "error", "Failed to save: " + e.message);
+  }
+}
+
+// Called from HTML: loadFreeformEntries('diary') / loadFreeformEntries('trips') etc.
+async function loadFreeformEntries(tabId) {
+  const tabCfg    = APP_CONFIG.tabs.find(t => t.id === tabId);
+  const sheetName = tabCfg ? tabCfg.sheetName : _capitalise(tabId);
+
+  const btn  = document.getElementById(tabId + "-refresh-btn");
+  if (btn) btn.textContent = "↺ Loading…";
+  _setTabStatus(tabId, "loading", "Loading entries…");
+
+  try {
+    const rows = await _readFreeformRows(sheetName);
+    const list = document.getElementById(tabId + "-list");
+
+    if (rows.length === 0) {
+      list.innerHTML = `<div class="empty-state">No entries yet.</div>`;
+      _setTabStatus(tabId, "ok", "No entries yet.");
+      return;
+    }
+
+    list.innerHTML = rows.map((row, idx) => {
+      const [ts, user, entry] = row;
+      const preview = (entry || "").substring(0, 60) + ((entry || "").length > 60 ? "…" : "");
+      return `
+        <div class="diary-entry" id="${tabId}-entry-${idx}">
+          <div class="diary-entry-header" onclick="toggleFreeformEntry('${tabId}', ${idx})">
+            <div class="diary-entry-meta">
+              <span class="diary-entry-date">${ts || ""}</span>
+              ${user ? `<span class="hist-user">${user}</span>` : ""}
+            </div>
+            <span class="diary-entry-preview" id="${tabId}-preview-${idx}">${preview}</span>
+            <span class="diary-chevron" id="${tabId}-chevron-${idx}">›</span>
+          </div>
+          <div class="diary-entry-body" id="${tabId}-body-${idx}">${(entry || "").replace(/\n/g, "<br>")}</div>
+        </div>`;
+    }).join("");
+
+    _setTabStatus(tabId, "ok", `${rows.length} entr${rows.length !== 1 ? "ies" : "y"} loaded.`);
+  } catch (e) {
+    _setTabStatus(tabId, "error", "Failed to load: " + e.message);
+  } finally {
+    if (btn) btn.textContent = "↺ Refresh entries";
+  }
+}
+
+function toggleFreeformEntry(tabId, idx) {
+  const body    = document.getElementById(`${tabId}-body-${idx}`);
+  const chevron = document.getElementById(`${tabId}-chevron-${idx}`);
+  const preview = document.getElementById(`${tabId}-preview-${idx}`);
+  const open    = body.classList.toggle("open");
+  chevron.style.transform = open ? "rotate(90deg)" : "";
+  preview.style.display   = open ? "none" : "";
+}
+
+// Internal: append a row to any sheet with columns [Timestamp, User, Entry]
+async function _appendFreeformRow(sheetName, user, entry) {
+  const id    = await getOrCreateSpreadsheet();
+  const token = await getAccessToken();
+  const ts    = _timestamp();
+  const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const res = await fetch(
+    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A:C:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: [[ts, user, entry]] })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Internal: read all data rows (skipping header) from any sheet
+async function _readFreeformRows(sheetName) {
+  const id    = await getOrCreateSpreadsheet();
+  const token = await getAccessToken();
+  const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const res = await fetch(
+    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A2:C`,
+    { headers: { "Authorization": `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  // Return most-recent-first
+  return (data.values || []).reverse();
+}
+
+// ── Backward-compat wrappers so index.html onclick="submitDiaryEntry()" still works ──
+function submitDiaryEntry()  { return submitFreeformEntry("diary"); }
+function loadDiaryEntries()  { return loadFreeformEntries("diary"); }
+function toggleDiaryEntry(i) { return toggleFreeformEntry("diary", i); }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHORES
@@ -225,8 +376,10 @@ async function logOtherChore() {
 }
 
 function setChoreStatus(state, msg) {
-  document.getElementById("status-dot").className = "status-dot " + state;
-  document.getElementById("status-text").textContent = msg;
+  const dot  = document.getElementById("status-dot");
+  const text = document.getElementById("status-text");
+  if (dot)  dot.className    = "status-dot " + state;
+  if (text) text.textContent = msg;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -311,7 +464,6 @@ async function fetchWildlifeHistory(i) {
     const rows = all.filter(r => r.species === species.name);
     if (rows.length === 0) { panel.innerHTML = `<div class="hist-empty">No sightings yet.</div>`; return; }
 
-    // Aggregate by day
     const byDay = {};
     rows.forEach(r => {
       const day = r.timestamp.split(",")[0].trim();
@@ -354,85 +506,39 @@ async function logOtherWildlife() {
 }
 
 function setWildlifeStatus(state, msg) {
-  document.getElementById("wildlife-status-dot").className = "status-dot " + state;
-  document.getElementById("wildlife-status-text").textContent = msg;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DIARY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-async function submitDiaryEntry() {
-  const textarea = document.getElementById("diary-text");
-  const text     = textarea.value.trim();
-  if (!text) return;
-  setDiaryStatus("loading", "Saving entry…");
-  try {
-    await appendDiary(currentUser, text);
-    textarea.value = "";
-    setDiaryStatus("ok", "Entry saved!");
-    const list = document.getElementById("diary-list");
-    if (list.children.length > 0) loadDiaryEntries();
-  } catch (e) {
-    setDiaryStatus("error", "Failed to save: " + e.message);
-  }
-}
-
-async function loadDiaryEntries() {
-  const btn = document.getElementById("diary-refresh-btn");
-  btn.textContent = "↺ Loading…";
-  setDiaryStatus("loading", "Loading entries…");
-  try {
-    const rows = await readDiary();
-    const list = document.getElementById("diary-list");
-    if (rows.length === 0) {
-      list.innerHTML = `<div class="empty-state">No entries yet.</div>`;
-      setDiaryStatus("ok", "No entries yet.");
-      return;
-    }
-    list.innerHTML = rows.map((row, idx) => `
-      <div class="diary-entry" id="diary-entry-${idx}">
-        <div class="diary-entry-header" onclick="toggleDiaryEntry(${idx})">
-          <div class="diary-entry-meta">
-            <span class="diary-entry-date">${row.timestamp}</span>
-            ${row.user ? `<span class="hist-user">${row.user}</span>` : ""}
-          </div>
-          <span class="diary-entry-preview" id="diary-preview-${idx}">${row.entry.substring(0, 60)}${row.entry.length > 60 ? "…" : ""}</span>
-          <span class="diary-chevron" id="diary-chevron-${idx}">›</span>
-        </div>
-        <div class="diary-entry-body" id="diary-body-${idx}">${row.entry.replace(/\n/g, "<br>")}</div>
-      </div>`).join("");
-    setDiaryStatus("ok", `${rows.length} entr${rows.length !== 1 ? "ies" : "y"} loaded.`);
-  } catch (e) {
-    setDiaryStatus("error", "Failed to load: " + e.message);
-  } finally {
-    btn.textContent = "↺ Refresh entries";
-  }
-}
-
-function toggleDiaryEntry(idx) {
-  const body    = document.getElementById(`diary-body-${idx}`);
-  const chevron = document.getElementById(`diary-chevron-${idx}`);
-  const preview = document.getElementById(`diary-preview-${idx}`);
-  const open    = body.classList.toggle("open");
-  chevron.style.transform = open ? "rotate(90deg)" : "";
-  preview.style.display   = open ? "none" : "";
-}
-
-function setDiaryStatus(state, msg) {
-  document.getElementById("diary-status-dot").className = "status-dot " + state;
-  document.getElementById("diary-status-text").textContent = msg;
+  const dot  = document.getElementById("wildlife-status-dot");
+  const text = document.getElementById("wildlife-status-text");
+  if (dot)  dot.className    = "status-dot " + state;
+  if (text) text.textContent = msg;
 }
 
 // ── SHARED HELPERS ────────────────────────────────────────────────────────────
+function _timestamp() {
+  return new Date().toLocaleString(undefined, {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+}
+
+function _capitalise(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function _setTabStatus(tabId, state, msg) {
+  const dot  = document.getElementById(tabId + "-status-dot");
+  const text = document.getElementById(tabId + "-status-text");
+  if (dot)  dot.className    = "status-dot " + state;
+  if (text) text.textContent = msg;
+}
+
 function formatTimestamp(ts) {
   if (!ts) return "—";
   const d    = new Date(ts);
   const diff = Math.floor((Date.now() - d) / 1000);
-  if (isNaN(diff)) return ts; // fallback if parse fails
+  if (isNaN(diff)) return ts;
   if (diff < 60)     return "Just now";
   if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return ts.split(",")[0]; // just the date portion
+  return ts.split(",")[0];
 }

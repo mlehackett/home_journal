@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Boat Journal">
 <link rel="apple-touch-icon" href="boat_icon.png">
@@ -59,10 +60,10 @@
     <div class="section-label">New Entry</div>
     <div class="diary-compose">
       <textarea class="diary-textarea" id="trips-text" placeholder="Where did you go?"></textarea>
-      <button class="diary-submit" onclick="submitEntry('trips')">Save Entry</button>
+      <button class="diary-submit" onclick="submitFreeformEntry('trips')">Save Entry</button>
     </div>
     <div class="section-label" style="margin-top:4px">Past Entries</div>
-    <button class="refresh-btn" id="trips-refresh-btn" onclick="loadEntries('trips')">↺ Load entries</button>
+    <button class="refresh-btn" id="trips-refresh-btn" onclick="loadFreeformEntries('trips')">↺ Load entries</button>
     <div id="trips-list" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 
@@ -75,10 +76,10 @@
     <div class="section-label">New Entry</div>
     <div class="diary-compose">
       <textarea class="diary-textarea" id="maintenance-text" placeholder="What was done?"></textarea>
-      <button class="diary-submit" onclick="submitEntry('maintenance')">Save Entry</button>
+      <button class="diary-submit" onclick="submitFreeformEntry('maintenance')">Save Entry</button>
     </div>
     <div class="section-label" style="margin-top:4px">Past Entries</div>
-    <button class="refresh-btn" id="maintenance-refresh-btn" onclick="loadEntries('maintenance')">↺ Load entries</button>
+    <button class="refresh-btn" id="maintenance-refresh-btn" onclick="loadFreeformEntries('maintenance')">↺ Load entries</button>
     <div id="maintenance-list" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 
@@ -115,167 +116,27 @@
 </div>
 
 <script>
-  // ── Config overrides (must run before sheets.js) ───────────────
-  window.JOURNAL_SPREADSHEET_NAME    = "Boat Journal";
-  window.JOURNAL_STORAGE_PREFIX      = "boat";
-  window.JOURNAL_SPREADSHEET_SHEETS  = [
+  window.JOURNAL_SPREADSHEET_NAME   = "Boat Journal";
+  window.JOURNAL_STORAGE_PREFIX     = "boat";
+  window.JOURNAL_SPREADSHEET_SHEETS = [
     { title: "Trips",       headers: ["Timestamp", "User", "Entry"] },
     { title: "Maintenance", headers: ["Timestamp", "User", "Entry"] }
   ];
-
-  // ── Tab switching ──────────────────────────────────────────────
-  function showTab(name, event) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    if (event) event.currentTarget.classList.add('active');
-    if (name === 'trips' || name === 'maintenance') loadEntries(name);
-  }
-
-  // ── User picker ────────────────────────────────────────────────
-  let currentUser = 'MLE';
-
-  function setUser(user) {
-    currentUser = user;
-    document.querySelectorAll('.user-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.user === user);
-    });
-  }
-
-  // ── Append a row to a named sheet ─────────────────────────────
-  // Mirrors appendDiary() from sheets.js, but takes sheetName as a param.
-  async function _appendEntry(sheetName, user, entry) {
-    const id    = await getOrCreateSpreadsheet();
-    const token = await getAccessToken();
-    const ts    = new Date().toLocaleString(undefined, {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit"
-    });
-    const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
-    const res = await fetch(
-      `${SHEETS_API}/${id}/values/${sheetName}!A:C:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ values: [[ts, user, entry]] })
-      }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
-    }
-    return res.json();
-  }
-
-  // ── Read all rows from a named sheet ──────────────────────────
-  async function _readEntries(sheetName) {
-    const id    = await getOrCreateSpreadsheet();
-    const token = await getAccessToken();
-    const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
-    const res = await fetch(
-      `${SHEETS_API}/${id}/values/${sheetName}!A2:C`,
-      { headers: { "Authorization": `Bearer ${token}` } }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    return data.values || [];
-  }
-
-  // ── Submit new entry ───────────────────────────────────────────
-  async function submitEntry(tab) {
-    const sheetName = tab === 'trips' ? 'Trips' : 'Maintenance';
-    const textarea  = document.getElementById(tab + '-text');
-    const text      = textarea.value.trim();
-    if (!text) return;
-
-    const dotEl  = document.getElementById(tab + '-status-dot');
-    const textEl = document.getElementById(tab + '-status-text');
-    dotEl.className    = 'status-dot syncing';
-    textEl.textContent = 'Saving…';
-
-    try {
-      await _appendEntry(sheetName, currentUser, text);
-      textarea.value     = '';
-      dotEl.className    = 'status-dot ok';
-      textEl.textContent = 'Saved.';
-      loadEntries(tab);
-    } catch (err) {
-      dotEl.className    = 'status-dot error';
-      textEl.textContent = 'Error: ' + err.message;
-    }
-  }
-
-  // ── Load past entries ──────────────────────────────────────────
-  async function loadEntries(tab) {
-    const sheetName = tab === 'trips' ? 'Trips' : 'Maintenance';
-    const listEl    = document.getElementById(tab + '-list');
-    const dotEl     = document.getElementById(tab + '-status-dot');
-    const textEl    = document.getElementById(tab + '-status-text');
-    dotEl.className    = 'status-dot syncing';
-    textEl.textContent = 'Loading…';
-    listEl.innerHTML   = '';
-
-    try {
-      const rows = await _readEntries(sheetName);
-      dotEl.className    = 'status-dot ok';
-      textEl.textContent = rows.length ? `${rows.length} entries.` : 'No entries yet.';
-
-      [...rows].reverse().forEach(row => {
-        const [ts, user, entry] = row;
-        const card = document.createElement('div');
-        card.className = 'diary-entry';
-        card.innerHTML = `
-          <div class="diary-meta">${ts || ''} · ${user || ''}</div>
-          <div class="diary-body">${escapeHtml(entry || '')}</div>
-        `;
-        listEl.appendChild(card);
-      });
-    } catch (err) {
-      dotEl.className    = 'status-dot error';
-      textEl.textContent = 'Error: ' + err.message;
-    }
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // ── Settings ───────────────────────────────────────────────────
-  function saveSettings() {
-    const sel = document.getElementById('s-default-user');
-    localStorage.setItem('boat_defaultUser', sel.value);
-    setUser(sel.value);
-  }
-
-  // ── Init — called by auth.js after sign-in ─────────────────────
-  async function initApp() {
-    const saved = localStorage.getItem('boat_defaultUser') || 'MLE';
-    setUser(saved);
-    document.getElementById('setup-default-user').value = saved;
-    document.getElementById('s-default-user').value     = saved;
-
-    try {
-      const id = await getOrCreateSpreadsheet();
-      const url = localStorage.getItem('boat_url');
-      if (url) {
-        const link = document.getElementById('s-sheet-url');
-        link.href        = url;
-        link.textContent = 'Open spreadsheet';
-      }
-    } catch (err) {
-      console.error('initApp error:', err);
-    }
-
-    loadEntries('trips');
-  }
+  window.APP_CONFIG = {
+    appName:       "Boat Journal",
+    storagePrefix: "boat",
+    tabs: [
+      { id: "trips",       type: "freeform", sheetName: "Trips",       placeholder: "Where did you go?" },
+      { id: "maintenance", type: "freeform", sheetName: "Maintenance", placeholder: "What was done?"    },
+      { id: "settings",    type: "settings" }
+    ]
+  };
 </script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
 <script src="sheets.js"></script>
+<script src="app.js"></script>
 
 </body>
 </html>
