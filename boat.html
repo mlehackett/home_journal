@@ -12,6 +12,40 @@
 <title>Boat Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+  /* ── Fuel tab styles ─────────────────────────────────────── */
+  .fuel-gauge-wrap      { margin: 12px 0 16px; }
+  .fuel-gauge-track     { background: rgba(255,255,255,0.12); border-radius: 8px; height: 18px; overflow: hidden; }
+  .fuel-gauge-fill      { height: 100%; border-radius: 8px; transition: width 0.4s ease; }
+  .fuel-gauge-label     { font-size: 13px; color: var(--text-muted, #aaa); margin-top: 6px; }
+  .fuel-stat-row        { display: flex; justify-content: space-between; align-items: baseline;
+                          padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .fuel-stat-row:last-child { border-bottom: none; }
+  .fuel-stat-label      { font-size: 13px; color: var(--text-muted, #aaa); }
+  .fuel-stat-val        { font-size: 14px; font-weight: 500; }
+  .fuel-to-fill         { font-size: 18px; font-weight: 600; }
+  .fuel-stat-muted .fuel-stat-val { font-size: 12px; color: var(--text-muted, #aaa); }
+  .fuel-warning         { background: rgba(192,57,43,0.2); border: 1px solid rgba(192,57,43,0.5);
+                          border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+                          font-size: 14px; font-weight: 500; color: #e74c3c; }
+  .fuel-status-note     { font-size: 13px; color: var(--text-muted, #aaa);
+                          margin-bottom: 12px; line-height: 1.5; }
+  .fuel-form            { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .fuel-field           { display: flex; flex-direction: column; gap: 6px; }
+  .fuel-field label     { font-size: 13px; color: var(--text-muted, #aaa); }
+  .fuel-input           { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+                          border-radius: 8px; color: inherit; font-size: 16px; padding: 10px 12px;
+                          font-family: inherit; width: 100%; box-sizing: border-box; }
+  .fuel-input:focus     { outline: none; border-color: rgba(255,255,255,0.4); }
+  .fuel-reset-row       { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .fuel-reset-row input { width: 18px; height: 18px; cursor: pointer; accent-color: #27ae60; }
+  .fuel-reset-row label { font-size: 15px; cursor: pointer; }
+  .fuel-badge           { display: inline-block; border-radius: 4px; padding: 2px 7px;
+                          font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+  .fuel-badge-full      { background: rgba(39,174,96,0.25); color: #2ecc71; }
+  .fuel-badge-add       { background: rgba(52,152,219,0.25); color: #3498db; }
+  .fuel-status-panel    { margin-bottom: 4px; }
+</style>
 </head>
 <body>
 
@@ -48,6 +82,7 @@
   <nav class="tab-bar">
     <button class="tab-btn active" onclick="showTab('trips',event)">Trips</button>
     <button class="tab-btn" onclick="showTab('maintenance',event)">Maintenance</button>
+    <button class="tab-btn" onclick="showTab('fuel',event)">Fuel</button>
     <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
   </nav>
 
@@ -81,6 +116,40 @@
     <div class="section-label" style="margin-top:4px">Past Entries</div>
     <button class="refresh-btn" id="maintenance-refresh-btn" onclick="loadFreeformEntries('maintenance')">↺ Load entries</button>
     <div id="maintenance-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+  <!-- FUEL TAB -->
+  <div class="tab-content" id="tab-fuel">
+    <div class="status-bar">
+      <div class="status-dot" id="fuel-status-dot"></div>
+      <span id="fuel-status-text">Ready.</span>
+    </div>
+
+    <div class="section-label">Current Status</div>
+    <div class="fuel-status-panel" id="fuel-status-panel">
+      <div class="empty-state">Tap refresh to load.</div>
+    </div>
+    <button class="refresh-btn" onclick="loadFuel()">↺ Refresh</button>
+
+    <div class="section-label" style="margin-top:12px">Log Entry</div>
+    <div class="fuel-form">
+      <div class="fuel-field">
+        <label for="fuel-engine-hours">Engine Hours (total)</label>
+        <input class="fuel-input" type="number" id="fuel-engine-hours" placeholder="e.g. 142.5" min="0" step="0.1">
+      </div>
+      <div class="fuel-field" id="fuel-added-row">
+        <label for="fuel-added">Fuel Added (gallons)</label>
+        <input class="fuel-input" type="number" id="fuel-added" placeholder="0" min="0" step="0.1">
+      </div>
+      <div class="fuel-reset-row">
+        <input type="checkbox" id="fuel-reset-full" onchange="_toggleFuelAddedField()">
+        <label for="fuel-reset-full">Reset to Full (filled tank completely)</label>
+      </div>
+      <button class="diary-submit" onclick="submitFuelEntry()">Save Entry</button>
+    </div>
+
+    <div class="section-label" style="margin-top:16px">History</div>
+    <div id="fuel-history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 
   <!-- SETTINGS TAB -->
@@ -120,7 +189,8 @@
   window.JOURNAL_STORAGE_PREFIX     = "boat";
   window.JOURNAL_SPREADSHEET_SHEETS = [
     { title: "Trips",       headers: ["Timestamp", "User", "Entry"] },
-    { title: "Maintenance", headers: ["Timestamp", "User", "Entry"] }
+    { title: "Maintenance", headers: ["Timestamp", "User", "Entry"] },
+    { title: "Fuel",        headers: ["Timestamp", "User", "Engine Hours", "Fuel Added", "Reset to Full"] }
   ];
   window.APP_CONFIG = {
     appName:       "Boat Journal",
@@ -128,7 +198,8 @@
     tabs: [
       { id: "trips",       type: "freeform", sheetName: "Trips",       placeholder: "Where did you go?" },
       { id: "maintenance", type: "freeform", sheetName: "Maintenance", placeholder: "What was done?"    },
-      { id: "settings",    type: "settings" }
+      { id: "fuel",        type: "fuel"                                                                  },
+      { id: "settings",    type: "settings"                                                              }
     ]
   };
 </script>

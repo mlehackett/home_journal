@@ -104,6 +104,7 @@ function showTab(name, e) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   if (e && e.currentTarget) e.currentTarget.classList.add("active");
+  if (name === "fuel") loadFuel();
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
@@ -541,4 +542,229 @@ function formatTimestamp(ts) {
   if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return ts.split(",")[0];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FUEL LOG
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FUEL_TANK_CAPACITY = 30;    // gallons
+const FUEL_BURN_RATE     = 0.5;   // gallons per engine hour
+const FUEL_LOW_THRESHOLD = 10;    // gallons — warn below this
+const FUEL_SHEET         = "Fuel";
+
+// ── Read all fuel rows ────────────────────────────────────────────────────────
+async function _readFuelRows() {
+  const id    = await getOrCreateSpreadsheet();
+  const token = await getAccessToken();
+  const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const res = await fetch(
+    `${SHEETS_API}/${id}/values/${FUEL_SHEET}!A2:E`,
+    { headers: { "Authorization": `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  // Each row: [timestamp, user, engineHours, fuelAdded, resetToFull]
+  return (data.values || []).map(r => ({
+    timestamp:   r[0] || "",
+    user:        r[1] || "",
+    engineHours: parseFloat(r[2]) || 0,
+    fuelAdded:   parseFloat(r[3]) || 0,
+    resetToFull: (r[4] || "").toLowerCase() === "yes"
+  }));
+}
+
+// ── Append a fuel row ─────────────────────────────────────────────────────────
+async function _appendFuelRow(user, engineHours, fuelAdded, resetToFull) {
+  const id    = await getOrCreateSpreadsheet();
+  const token = await getAccessToken();
+  const ts    = _timestamp();
+  const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const res = await fetch(
+    `${SHEETS_API}/${id}/values/${FUEL_SHEET}!A:E:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: [[ts, user, engineHours, fuelAdded, resetToFull ? "Yes" : "No"]] })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Compute current fuel state from rows ──────────────────────────────────────
+function _computeFuelState(rows) {
+  if (rows.length === 0) return null;
+
+  // Find the most recent reset-to-full row
+  let resetIdx = -1;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].resetToFull) { resetIdx = i; break; }
+  }
+
+  if (resetIdx === -1) {
+    // No full reset ever recorded — can't compute reliably
+    return { noBaseline: true, latestHours: rows[rows.length - 1].engineHours };
+  }
+
+  const baseline    = rows[resetIdx];
+  const rowsSince   = rows.slice(resetIdx + 1); // entries after the reset
+  const latestHours = rows[rows.length - 1].engineHours;
+
+  const hoursSinceReset  = Math.max(0, latestHours - baseline.engineHours);
+  const gallonsBurned    = hoursSinceReset * FUEL_BURN_RATE;
+  const partialFillsSince = rowsSince.reduce((sum, r) => sum + (r.resetToFull ? 0 : r.fuelAdded), 0);
+  const gallonsRemaining = Math.max(0, FUEL_TANK_CAPACITY - gallonsBurned + partialFillsSince);
+  const gallonsToFill    = Math.max(0, FUEL_TANK_CAPACITY - gallonsRemaining);
+  const percentFull      = Math.round((gallonsRemaining / FUEL_TANK_CAPACITY) * 100);
+  const isLow            = gallonsRemaining < FUEL_LOW_THRESHOLD;
+
+  return {
+    noBaseline:        false,
+    resetTimestamp:    baseline.timestamp,
+    resetHours:        baseline.engineHours,
+    latestHours,
+    hoursSinceReset,
+    gallonsBurned:     Math.round(gallonsBurned * 10) / 10,
+    gallonsRemaining:  Math.round(gallonsRemaining * 10) / 10,
+    gallonsToFill:     Math.round(gallonsToFill * 10) / 10,
+    percentFull,
+    isLow
+  };
+}
+
+// ── Render fuel status panel ──────────────────────────────────────────────────
+function _renderFuelStatus(state) {
+  const panel = document.getElementById("fuel-status-panel");
+  if (!panel) return;
+
+  if (!state) {
+    panel.innerHTML = `<div class="empty-state">No fuel entries yet — log an entry below.</div>`;
+    return;
+  }
+
+  if (state.noBaseline) {
+    panel.innerHTML = `
+      <div class="fuel-status-note">⚠️ No "Reset to Full" entry found. Log a full tank to establish a baseline.</div>
+      <div class="fuel-stat-row"><span class="fuel-stat-label">Latest engine hours</span><span class="fuel-stat-val">${state.latestHours} hrs</span></div>`;
+    return;
+  }
+
+  const barColor = state.isLow ? "#c0392b" : state.percentFull < 50 ? "#e67e22" : "#27ae60";
+  const warning  = state.isLow
+    ? `<div class="fuel-warning">⚠️ Low fuel — estimated ${state.gallonsRemaining} gal remaining</div>`
+    : "";
+
+  panel.innerHTML = `
+    ${warning}
+    <div class="fuel-gauge-wrap">
+      <div class="fuel-gauge-track">
+        <div class="fuel-gauge-fill" style="width:${state.percentFull}%;background:${barColor}"></div>
+      </div>
+      <div class="fuel-gauge-label">${state.percentFull}% full &nbsp;·&nbsp; ~${state.gallonsRemaining} gal remaining</div>
+    </div>
+    <div class="fuel-stat-row"><span class="fuel-stat-label">Estimated to fill</span><span class="fuel-stat-val fuel-to-fill">${state.gallonsToFill} gal</span></div>
+    <div class="fuel-stat-row"><span class="fuel-stat-label">Engine hours now</span><span class="fuel-stat-val">${state.latestHours} hrs</span></div>
+    <div class="fuel-stat-row"><span class="fuel-stat-label">Hours since full</span><span class="fuel-stat-val">${state.hoursSinceReset} hrs</span></div>
+    <div class="fuel-stat-row"><span class="fuel-stat-label">Estimated burned</span><span class="fuel-stat-val">${state.gallonsBurned} gal</span></div>
+    <div class="fuel-stat-row fuel-stat-muted"><span class="fuel-stat-label">Last full</span><span class="fuel-stat-val">${state.resetTimestamp}</span></div>`;
+}
+
+// ── Render fuel history list ──────────────────────────────────────────────────
+function _renderFuelHistory(rows) {
+  const list = document.getElementById("fuel-history-list");
+  if (!list) return;
+
+  if (rows.length === 0) {
+    list.innerHTML = `<div class="empty-state">No entries yet.</div>`;
+    return;
+  }
+
+  list.innerHTML = [...rows].reverse().map(r => {
+    const badge = r.resetToFull
+      ? `<span class="fuel-badge fuel-badge-full">FULL</span>`
+      : (r.fuelAdded > 0 ? `<span class="fuel-badge fuel-badge-add">+${r.fuelAdded} gal</span>` : "");
+    return `
+      <div class="diary-entry">
+        <div class="diary-entry-header" style="cursor:default">
+          <div class="diary-entry-meta">
+            <span class="diary-entry-date">${r.timestamp}</span>
+            ${r.user ? `<span class="hist-user">${r.user}</span>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="fuel-stat-label">${r.engineHours} hrs</span>
+            ${badge}
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ── Load fuel tab ─────────────────────────────────────────────────────────────
+async function loadFuel() {
+  _setTabStatus("fuel", "loading", "Loading fuel data…");
+  try {
+    const rows  = await _readFuelRows();
+    const state = _computeFuelState(rows);
+    _renderFuelStatus(state);
+    _renderFuelHistory(rows);
+    _setTabStatus("fuel", "ok", "");
+    // Pre-fill engine hours with latest known value
+    if (rows.length > 0) {
+      const hoursInput = document.getElementById("fuel-engine-hours");
+      if (hoursInput && !hoursInput.value) {
+        hoursInput.value = rows[rows.length - 1].engineHours;
+      }
+    }
+  } catch (e) {
+    _setTabStatus("fuel", "error", "Error: " + e.message);
+  }
+}
+
+// ── Submit fuel entry ─────────────────────────────────────────────────────────
+async function submitFuelEntry() {
+  const hoursInput  = document.getElementById("fuel-engine-hours");
+  const fuelInput   = document.getElementById("fuel-added");
+  const resetCheck  = document.getElementById("fuel-reset-full");
+
+  const engineHours = parseFloat(hoursInput.value);
+  if (isNaN(engineHours) || engineHours < 0) {
+    _setTabStatus("fuel", "error", "Enter valid engine hours.");
+    return;
+  }
+
+  const resetToFull = resetCheck.checked;
+  const fuelAdded   = resetToFull ? 0 : (parseFloat(fuelInput.value) || 0);
+
+  _setTabStatus("fuel", "loading", "Saving…");
+  try {
+    await _appendFuelRow(currentUser, engineHours, fuelAdded, resetToFull);
+    fuelInput.value      = "";
+    resetCheck.checked   = false;
+    _toggleFuelAddedField(); // re-show fuel added field
+    _setTabStatus("fuel", "ok", "Saved.");
+    await loadFuel();
+  } catch (e) {
+    _setTabStatus("fuel", "error", "Error: " + e.message);
+  }
+}
+
+// ── Toggle fuel-added field visibility based on Reset checkbox ────────────────
+function _toggleFuelAddedField() {
+  const resetCheck   = document.getElementById("fuel-reset-full");
+  const fuelAddedRow = document.getElementById("fuel-added-row");
+  if (!fuelAddedRow) return;
+  if (resetCheck && resetCheck.checked) {
+    fuelAddedRow.style.opacity     = "0.4";
+    fuelAddedRow.style.pointerEvents = "none";
+  } else {
+    fuelAddedRow.style.opacity     = "1";
+    fuelAddedRow.style.pointerEvents = "";
+  }
 }
