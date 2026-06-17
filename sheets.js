@@ -1,11 +1,25 @@
 // ── GOOGLE SHEETS API ─────────────────────────────────────────────────────────
 // Handles spreadsheet creation, sheet setup, and data read/write.
 
-const SPREADSHEET_NAME = "Home Journal";
+const SPREADSHEET_NAME = window.JOURNAL_SPREADSHEET_NAME ?? "Home Journal";
 const SHEETS_API       = "https://sheets.googleapis.com/v4/spreadsheets";
 const DRIVE_API        = "https://www.googleapis.com/drive/v3/files";
 
-// Sheet names
+// Storage keys — namespaced per app so Home Journal and Boat Journal
+// don't collide when both are used from the same browser.
+const _prefix         = window.JOURNAL_STORAGE_PREFIX ?? "";
+const STORAGE_KEY_ID  = _prefix ? `${_prefix}_id`  : "spreadsheet_id";
+const STORAGE_KEY_URL = _prefix ? `${_prefix}_url` : "spreadsheet_url";
+
+// Default sheet definitions (Home Journal). boat.html overrides this via
+// window.JOURNAL_SPREADSHEET_SHEETS before this file loads.
+const SPREADSHEET_SHEETS = window.JOURNAL_SPREADSHEET_SHEETS ?? [
+  { title: "Chores",   headers: ["Timestamp", "User", "Chore", "Quantity"] },
+  { title: "Wildlife", headers: ["Timestamp", "User", "Species"] },
+  { title: "Diary",    headers: ["Timestamp", "User", "Entry"] }
+];
+
+// Sheet names (Home Journal uses these directly; boat.html uses its own calls)
 const SHEET_CHORES   = "Chores";
 const SHEET_WILDLIFE = "Wildlife";
 const SHEET_DIARY    = "Diary";
@@ -17,7 +31,7 @@ let _creatingSpreadsheet = null; // promise lock
 
 async function getOrCreateSpreadsheet() {
   // Check localStorage first
-  const stored = localStorage.getItem("spreadsheet_id");
+  const stored = localStorage.getItem(STORAGE_KEY_ID);
   if (stored) return stored;
   // If already in progress, wait for it
   if (_creatingSpreadsheet) return await _creatingSpreadsheet;
@@ -28,7 +42,7 @@ async function getOrCreateSpreadsheet() {
 
 async function _findOrCreateSpreadsheet() {
   const token = await getAccessToken();
-  // Search for an existing "Home Journal" spreadsheet created by this app
+  // Search for an existing spreadsheet with this name created by this app
   const query = encodeURIComponent(`name='${SPREADSHEET_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`);
   const res   = await fetch(`${DRIVE_API}?q=${query}&fields=files(id,name)`, {
     headers: { "Authorization": `Bearer ${token}` }
@@ -38,10 +52,9 @@ async function _findOrCreateSpreadsheet() {
   const files = data.files || [];
 
   if (files.length > 0) {
-    // Use the first match (most likely the one we created)
     const id = files[0].id;
-    localStorage.setItem("spreadsheet_id", id);
-    localStorage.setItem("spreadsheet_url", `https://docs.google.com/spreadsheets/d/${id}`);
+    localStorage.setItem(STORAGE_KEY_ID, id);
+    localStorage.setItem(STORAGE_KEY_URL, `https://docs.google.com/spreadsheets/d/${id}`);
     return id;
   }
   // Nothing found — create fresh
@@ -53,26 +66,16 @@ async function createSpreadsheet() {
 
   const body = {
     properties: { title: SPREADSHEET_NAME },
-    sheets: [
-      {
-        properties: { title: SHEET_CHORES },
-        data: [{ rowData: [{ values: _headerCells(["Timestamp", "User", "Chore", "Quantity"]) }] }]
-      },
-      {
-        properties: { title: SHEET_WILDLIFE },
-        data: [{ rowData: [{ values: _headerCells(["Timestamp", "User", "Species"]) }] }]
-      },
-      {
-        properties: { title: SHEET_DIARY },
-        data: [{ rowData: [{ values: _headerCells(["Timestamp", "User", "Entry"]) }] }]
-      }
-    ]
+    sheets: SPREADSHEET_SHEETS.map(s => ({
+      properties: { title: s.title },
+      data: [{ rowData: [{ values: _headerCells(s.headers) }] }]
+    }))
   };
 
   const res = await _sheetsRequest("POST", "", body, token);
   const id  = res.spreadsheetId;
-  localStorage.setItem("spreadsheet_id", id);
-  localStorage.setItem("spreadsheet_url", `https://docs.google.com/spreadsheets/d/${id}`);
+  localStorage.setItem(STORAGE_KEY_ID, id);
+  localStorage.setItem(STORAGE_KEY_URL, `https://docs.google.com/spreadsheets/d/${id}`);
   return id;
 }
 
@@ -160,9 +163,9 @@ async function getUniqueSpecies() {
   const rows = await _readSheet(SHEET_WILDLIFE, "A2:C");
   const lastSeen = new Map();
   for (const row of rows) {
-    const existing = lastSeen.get(row[2]); // row[1] = species name
+    const existing = lastSeen.get(row[2]);
     if (!existing || new Date(row[0]) > new Date(existing)) {
-      lastSeen.set(row[2], new Date(row[0])); // row[0] = timestamp
+      lastSeen.set(row[2], new Date(row[0]));
     }
   }
   const sorted = [...lastSeen.entries()].sort((a, b) => b[1] - a[1]);

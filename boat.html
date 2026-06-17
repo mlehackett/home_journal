@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boat Journal">
+<link rel="apple-touch-icon" href="boat_icon.png">
+<link rel="manifest" href="boat_manifest.json">
+<title>Boat Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-title">Boat <span>Journal</span></div>
+  <div class="setup-desc">Sign in with Google to get started. Your data will be stored in a Google Sheet in your Drive.</div>
+  <div class="setup-card">
+    <div class="setup-field">
+      <label>Default User for This Device</label>
+      <select class="setup-input" id="setup-default-user">
+        <option value="MLE">MLE</option>
+        <option value="CYD">CYD</option>
+      </select>
+    </div>
+    <button class="setup-btn google-btn" id="signin-btn" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;margin-right:8px"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      Sign in with Google
+    </button>
+    <div class="setup-error" id="setup-error"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <header class="app-header">
+    <div class="app-title">Boat <span>Journal</span></div>
+    <div class="user-picker">
+      <button class="user-btn active" data-user="MLE" onclick="setUser('MLE')">MLE</button>
+      <button class="user-btn" data-user="CYD" onclick="setUser('CYD')">CYD</button>
+    </div>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('trips',event)">Trips</button>
+    <button class="tab-btn" onclick="showTab('maintenance',event)">Maintenance</button>
+    <button class="tab-btn" onclick="showTab('settings',event)">Settings</button>
+  </nav>
+
+  <!-- TRIPS TAB -->
+  <div class="tab-content active" id="tab-trips">
+    <div class="status-bar">
+      <div class="status-dot" id="trips-status-dot"></div>
+      <span id="trips-status-text">Ready.</span>
+    </div>
+    <div class="section-label">New Entry</div>
+    <div class="diary-compose">
+      <textarea class="diary-textarea" id="trips-text" placeholder="Where did you go?"></textarea>
+      <button class="diary-submit" onclick="submitEntry('trips')">Save Entry</button>
+    </div>
+    <div class="section-label" style="margin-top:4px">Past Entries</div>
+    <button class="refresh-btn" id="trips-refresh-btn" onclick="loadEntries('trips')">↺ Load entries</button>
+    <div id="trips-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+  <!-- MAINTENANCE TAB -->
+  <div class="tab-content" id="tab-maintenance">
+    <div class="status-bar">
+      <div class="status-dot" id="maintenance-status-dot"></div>
+      <span id="maintenance-status-text">Ready.</span>
+    </div>
+    <div class="section-label">New Entry</div>
+    <div class="diary-compose">
+      <textarea class="diary-textarea" id="maintenance-text" placeholder="What was done?"></textarea>
+      <button class="diary-submit" onclick="submitEntry('maintenance')">Save Entry</button>
+    </div>
+    <div class="section-label" style="margin-top:4px">Past Entries</div>
+    <button class="refresh-btn" id="maintenance-refresh-btn" onclick="loadEntries('maintenance')">↺ Load entries</button>
+    <div id="maintenance-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-content" id="tab-settings">
+    <div class="section-label">Google Sheets</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">Spreadsheet</div>
+        <a class="settings-link" id="s-sheet-url" href="#" target="_blank">Not yet created</a>
+      </div>
+      <div class="settings-note">To share with CYD: open the spreadsheet, click Share, and add his Google account with Editor access.</div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Default User</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <div class="settings-label">This device logs as</div>
+        <select class="settings-input" id="s-default-user">
+          <option value="MLE">MLE</option>
+          <option value="CYD">CYD</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <button class="settings-save" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+    <div class="section-label" style="margin-top:8px">Account</div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <button class="settings-signout" onclick="handleSignOut()">Sign out of Google</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Config overrides (must run before sheets.js) ───────────────
+  window.JOURNAL_SPREADSHEET_NAME    = "Boat Journal";
+  window.JOURNAL_STORAGE_PREFIX      = "boat";
+  window.JOURNAL_SPREADSHEET_SHEETS  = [
+    { title: "Trips",       headers: ["Timestamp", "User", "Entry"] },
+    { title: "Maintenance", headers: ["Timestamp", "User", "Entry"] }
+  ];
+
+  // ── Tab switching ──────────────────────────────────────────────
+  function showTab(name, event) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    if (event) event.currentTarget.classList.add('active');
+    if (name === 'trips' || name === 'maintenance') loadEntries(name);
+  }
+
+  // ── User picker ────────────────────────────────────────────────
+  let currentUser = 'MLE';
+
+  function setUser(user) {
+    currentUser = user;
+    document.querySelectorAll('.user-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.user === user);
+    });
+  }
+
+  // ── Append a row to a named sheet ─────────────────────────────
+  // Mirrors appendDiary() from sheets.js, but takes sheetName as a param.
+  async function _appendEntry(sheetName, user, entry) {
+    const id    = await getOrCreateSpreadsheet();
+    const token = await getAccessToken();
+    const ts    = new Date().toLocaleString(undefined, {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+    const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+    const res = await fetch(
+      `${SHEETS_API}/${id}/values/${sheetName}!A:C:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ values: [[ts, user, entry]] })
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+    }
+    return res.json();
+  }
+
+  // ── Read all rows from a named sheet ──────────────────────────
+  async function _readEntries(sheetName) {
+    const id    = await getOrCreateSpreadsheet();
+    const token = await getAccessToken();
+    const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+    const res = await fetch(
+      `${SHEETS_API}/${id}/values/${sheetName}!A2:C`,
+      { headers: { "Authorization": `Bearer ${token}` } }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Sheets API HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return data.values || [];
+  }
+
+  // ── Submit new entry ───────────────────────────────────────────
+  async function submitEntry(tab) {
+    const sheetName = tab === 'trips' ? 'Trips' : 'Maintenance';
+    const textarea  = document.getElementById(tab + '-text');
+    const text      = textarea.value.trim();
+    if (!text) return;
+
+    const dotEl  = document.getElementById(tab + '-status-dot');
+    const textEl = document.getElementById(tab + '-status-text');
+    dotEl.className    = 'status-dot syncing';
+    textEl.textContent = 'Saving…';
+
+    try {
+      await _appendEntry(sheetName, currentUser, text);
+      textarea.value     = '';
+      dotEl.className    = 'status-dot ok';
+      textEl.textContent = 'Saved.';
+      loadEntries(tab);
+    } catch (err) {
+      dotEl.className    = 'status-dot error';
+      textEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  // ── Load past entries ──────────────────────────────────────────
+  async function loadEntries(tab) {
+    const sheetName = tab === 'trips' ? 'Trips' : 'Maintenance';
+    const listEl    = document.getElementById(tab + '-list');
+    const dotEl     = document.getElementById(tab + '-status-dot');
+    const textEl    = document.getElementById(tab + '-status-text');
+    dotEl.className    = 'status-dot syncing';
+    textEl.textContent = 'Loading…';
+    listEl.innerHTML   = '';
+
+    try {
+      const rows = await _readEntries(sheetName);
+      dotEl.className    = 'status-dot ok';
+      textEl.textContent = rows.length ? `${rows.length} entries.` : 'No entries yet.';
+
+      [...rows].reverse().forEach(row => {
+        const [ts, user, entry] = row;
+        const card = document.createElement('div');
+        card.className = 'diary-entry';
+        card.innerHTML = `
+          <div class="diary-meta">${ts || ''} · ${user || ''}</div>
+          <div class="diary-body">${escapeHtml(entry || '')}</div>
+        `;
+        listEl.appendChild(card);
+      });
+    } catch (err) {
+      dotEl.className    = 'status-dot error';
+      textEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Settings ───────────────────────────────────────────────────
+  function saveSettings() {
+    const sel = document.getElementById('s-default-user');
+    localStorage.setItem('boat_defaultUser', sel.value);
+    setUser(sel.value);
+  }
+
+  // ── Init — called by auth.js after sign-in ─────────────────────
+  async function initApp() {
+    const saved = localStorage.getItem('boat_defaultUser') || 'MLE';
+    setUser(saved);
+    document.getElementById('setup-default-user').value = saved;
+    document.getElementById('s-default-user').value     = saved;
+
+    try {
+      const id = await getOrCreateSpreadsheet();
+      const url = localStorage.getItem('boat_url');
+      if (url) {
+        const link = document.getElementById('s-sheet-url');
+        link.href        = url;
+        link.textContent = 'Open spreadsheet';
+      }
+    } catch (err) {
+      console.error('initApp error:', err);
+    }
+
+    loadEntries('trips');
+  }
+</script>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script src="sheets.js"></script>
+
+</body>
+</html>

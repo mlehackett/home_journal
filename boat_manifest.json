@@ -1,0 +1,15 @@
+{
+  "name": "Boat Journal",
+  "short_name": "Boat Journal",
+  "start_url": "/home_journal/boat.html",
+  "display": "standalone",
+  "background_color": "#1a2a3a",
+  "theme_color": "#1a2a3a",
+  "icons": [
+    {
+      "src": "boat_icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

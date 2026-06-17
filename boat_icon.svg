@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Sky background -->
+  <rect width="512" height="512" fill="#1a2a3a"/>
+
+  <!-- Moon / light circle -->
+  <circle cx="400" cy="100" r="48" fill="#f0c040" opacity="0.85"/>
+
+  <!-- Mast -->
+  <rect x="252" y="90" width="8" height="210" fill="#e8dcc8" rx="3"/>
+
+  <!-- Main sail (triangle) -->
+  <polygon points="256,95 256,255 140,255" fill="#f5f0e8" opacity="0.95"/>
+
+  <!-- Jib sail (smaller forward triangle) -->
+  <polygon points="256,130 256,255 320,255" fill="#dde8f0" opacity="0.85"/>
+
+  <!-- Hull -->
+  <path d="M120 270 Q256 310 392 270 L370 300 Q256 340 142 300 Z" fill="#c8a050"/>
+  <!-- Hull highlight -->
+  <path d="M140 278 Q256 316 372 278 L365 288 Q256 322 147 288 Z" fill="#e0b860" opacity="0.5"/>
+
+  <!-- Water waves -->
+  <path d="M40 330 Q100 315 160 330 Q220 345 280 330 Q340 315 400 330 Q460 345 472 330"
+        fill="none" stroke="#4a90b8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M40 355 Q110 340 180 355 Q250 370 320 355 Q390 340 472 355"
+        fill="none" stroke="#3a7898" stroke-width="5" stroke-linecap="round"/>
+  <path d="M40 378 Q120 363 200 378 Q280 393 360 378 Q420 367 472 378"
+        fill="none" stroke="#2d6070" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Water fill below waves -->
+  <path d="M0 360 Q60 345 120 360 Q180 375 240 360 Q300 345 360 360 Q420 375 512 360 L512 512 L0 512 Z"
+        fill="#1e4a6a" opacity="0.7"/>
+
+  <!-- Moon reflection on water -->
+  <ellipse cx="400" cy="390" rx="18" ry="6" fill="#f0c040" opacity="0.25"/>
+  <ellipse cx="400" cy="408" rx="10" ry="4" fill="#f0c040" opacity="0.15"/>
+
+  <!-- Flag at top of mast -->
+  <polygon points="260,90 260,108 284,99" fill="#c84040" opacity="0.9"/>
+</svg>
