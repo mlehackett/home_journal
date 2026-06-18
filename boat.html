@@ -45,6 +45,18 @@
   .fuel-badge-full      { background: rgba(39,174,96,0.25); color: #2ecc71; }
   .fuel-badge-add       { background: rgba(52,152,219,0.25); color: #3498db; }
   .fuel-status-panel    { margin-bottom: 4px; }
+
+  /* ── Navionics stats ─────────────────────────────────────── */
+  .nav-link-input       { width: 100%; box-sizing: border-box; margin-top: 8px;
+                          background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+                          border-radius: 8px; color: inherit; font-size: 14px; padding: 9px 12px;
+                          font-family: inherit; }
+  .nav-link-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .nav-stats            { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .nav-stat             { background: rgba(52,152,219,0.15); border: 1px solid rgba(52,152,219,0.3);
+                          border-radius: 6px; padding: 3px 9px; font-size: 13px; color: #7fb9e0; }
+  .nav-link             { font-size: 13px; color: #3498db; text-decoration: none; margin-left: auto; }
+  .nav-link:hover       { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -95,6 +107,8 @@
     <div class="section-label">New Entry</div>
     <div class="diary-compose">
       <textarea class="diary-textarea" id="trips-text" placeholder="Where did you go?"></textarea>
+      <input class="nav-link-input" type="url" id="trips-nav-link"
+             placeholder="Navionics share link (optional)">
       <button class="diary-submit" onclick="submitFreeformEntry('trips')">Save Entry</button>
     </div>
     <div class="section-label" style="margin-top:4px">Past Entries</div>
@@ -125,7 +139,6 @@
       <span id="fuel-status-text">Ready.</span>
     </div>
 
-    <div class="section-label">Current Status</div>
     <div class="fuel-status-panel" id="fuel-status-panel">
       <div class="empty-state">Tap refresh to load.</div>
     </div>
@@ -188,7 +201,7 @@
   window.JOURNAL_SPREADSHEET_NAME   = "Boat Journal";
   window.JOURNAL_STORAGE_PREFIX     = "boat";
   window.JOURNAL_SPREADSHEET_SHEETS = [
-    { title: "Trips",       headers: ["Timestamp", "User", "Entry"] },
+    { title: "Trips",       headers: ["Timestamp", "User", "Entry", "Nav Link", "Duration", "Distance (nm)", "Max Speed (kts)"] },
     { title: "Maintenance", headers: ["Timestamp", "User", "Entry"] },
     { title: "Fuel",        headers: ["Timestamp", "User", "Engine Hours", "Fuel Added", "Reset to Full"] }
   ];

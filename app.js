@@ -127,19 +127,42 @@ function saveSettings() {
 
 // Called from HTML: submitFreeformEntry('diary') / submitFreeformEntry('trips') etc.
 async function submitFreeformEntry(tabId) {
-  const tabCfg   = APP_CONFIG.tabs.find(t => t.id === tabId);
+  const tabCfg    = APP_CONFIG.tabs.find(t => t.id === tabId);
   const sheetName = tabCfg ? tabCfg.sheetName : _capitalise(tabId);
 
   const textarea = document.getElementById(tabId + "-text");
   const text     = textarea.value.trim();
   if (!text) return;
 
+  // Trips tab: parse optional Navionics link
+  let navLink = "", navStats = null;
+  if (tabId === "trips") {
+    const navInput = document.getElementById("trips-nav-link");
+    if (navInput && navInput.value.trim()) {
+      const raw = navInput.value.trim();
+      navLink = _extractNavUrl(raw);
+      if (navLink) {
+        _setTabStatus(tabId, "loading", "Fetching track stats…");
+        try {
+          navStats = await _fetchNavStats(navLink);
+        } catch (e) {
+          // Non-fatal — save without stats, note the error
+          _setTabStatus(tabId, "loading", "Could not fetch track stats — saving anyway…");
+        }
+      }
+    }
+  }
+
   _setTabStatus(tabId, "loading", "Saving entry…");
   try {
-    await _appendFreeformRow(sheetName, currentUser, text);
+    const extra = tabId === "trips"
+      ? [navLink, navStats ? navStats.duration : "", navStats ? navStats.distance : "", navStats ? navStats.maxSpeed : ""]
+      : [];
+    await _appendFreeformRow(sheetName, currentUser, text, extra);
     textarea.value = "";
+    const navInput = document.getElementById("trips-nav-link");
+    if (navInput) navInput.value = "";
     _setTabStatus(tabId, "ok", "Entry saved!");
-    // Reload list if it's already been opened
     const list = document.getElementById(tabId + "-list");
     if (list && list.children.length > 0) loadFreeformEntries(tabId);
   } catch (e) {
@@ -157,7 +180,8 @@ async function loadFreeformEntries(tabId) {
   _setTabStatus(tabId, "loading", "Loading entries…");
 
   try {
-    const rows = await _readFreeformRows(sheetName);
+    const cols = tabId === "trips" ? 7 : 3;
+    const rows = await _readFreeformRows(sheetName, cols);
     const list = document.getElementById(tabId + "-list");
 
     if (rows.length === 0) {
@@ -167,8 +191,19 @@ async function loadFreeformEntries(tabId) {
     }
 
     list.innerHTML = rows.map((row, idx) => {
-      const [ts, user, entry] = row;
+      const [ts, user, entry, navLink, duration, distance, maxSpeed] = row;
       const preview = (entry || "").substring(0, 60) + ((entry || "").length > 60 ? "…" : "");
+
+      // Build nav stats badge for trips tab
+      const navBadge = (tabId === "trips" && (duration || distance || maxSpeed)) ? `
+        <div class="nav-stats">
+          ${duration  ? `<span class="nav-stat">⏱ ${duration}</span>`       : ""}
+          ${distance  ? `<span class="nav-stat">⚓ ${distance} nm</span>`    : ""}
+          ${maxSpeed  ? `<span class="nav-stat">💨 ${maxSpeed} kts max</span>` : ""}
+          ${navLink   ? `<a class="nav-link" href="${navLink}" target="_blank">View track ↗</a>` : ""}
+        </div>` : (tabId === "trips" && navLink ? `
+        <div class="nav-stats"><a class="nav-link" href="${navLink}" target="_blank">View track ↗</a></div>` : "");
+
       return `
         <div class="diary-entry" id="${tabId}-entry-${idx}">
           <div class="diary-entry-header" onclick="toggleFreeformEntry('${tabId}', ${idx})">
@@ -179,7 +214,10 @@ async function loadFreeformEntries(tabId) {
             <span class="diary-entry-preview" id="${tabId}-preview-${idx}">${preview}</span>
             <span class="diary-chevron" id="${tabId}-chevron-${idx}">›</span>
           </div>
-          <div class="diary-entry-body" id="${tabId}-body-${idx}">${(entry || "").replace(/\n/g, "<br>")}</div>
+          <div class="diary-entry-body" id="${tabId}-body-${idx}">
+            ${(entry || "").replace(/\n/g, "<br>")}
+            ${navBadge}
+          </div>
         </div>`;
     }).join("");
 
@@ -200,18 +238,25 @@ function toggleFreeformEntry(tabId, idx) {
   preview.style.display   = open ? "none" : "";
 }
 
-// Internal: append a row to any sheet with columns [Timestamp, User, Entry]
-async function _appendFreeformRow(sheetName, user, entry) {
+// Internal: convert column count to letter (1=A, 2=B … 26=Z)
+function _colLetter(n) {
+  return String.fromCharCode(64 + Math.min(n, 26));
+}
+
+// Internal: append a row to any sheet.
+// extra[] = optional additional columns after [Timestamp, User, Entry]
+async function _appendFreeformRow(sheetName, user, entry, extra = []) {
   const id    = await getOrCreateSpreadsheet();
   const token = await getAccessToken();
   const ts    = _timestamp();
   const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const row = [ts, user, entry, ...extra];
   const res = await fetch(
-    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A:C:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A:${_colLetter(row.length)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
     {
       method: "POST",
       headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: [[ts, user, entry]] })
+      body: JSON.stringify({ values: [row] })
     }
   );
   if (!res.ok) {
@@ -221,13 +266,14 @@ async function _appendFreeformRow(sheetName, user, entry) {
   return res.json();
 }
 
-// Internal: read all data rows (skipping header) from any sheet
-async function _readFreeformRows(sheetName) {
+// Internal: read all data rows (skipping header) from any sheet.
+// cols = number of columns to read (default 3 for standard freeform tabs)
+async function _readFreeformRows(sheetName, cols = 3) {
   const id    = await getOrCreateSpreadsheet();
   const token = await getAccessToken();
   const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
   const res = await fetch(
-    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A2:C`,
+    `${SHEETS_API}/${id}/values/${encodeURIComponent(sheetName)}!A2:${_colLetter(cols)}`,
     { headers: { "Authorization": `Bearer ${token}` } }
   );
   if (!res.ok) {
@@ -672,7 +718,6 @@ function _renderFuelStatus(state) {
     <div class="fuel-stat-row"><span class="fuel-stat-label">Estimated to fill</span><span class="fuel-stat-val fuel-to-fill">${state.gallonsToFill} gal</span></div>
     <div class="fuel-stat-row"><span class="fuel-stat-label">Engine hours now</span><span class="fuel-stat-val">${state.latestHours} hrs</span></div>
     <div class="fuel-stat-row"><span class="fuel-stat-label">Hours since full</span><span class="fuel-stat-val">${state.hoursSinceReset} hrs</span></div>
-    <div class="fuel-stat-row"><span class="fuel-stat-label">Estimated burned</span><span class="fuel-stat-val">${state.gallonsBurned} gal</span></div>
     <div class="fuel-stat-row fuel-stat-muted"><span class="fuel-stat-label">Last full</span><span class="fuel-stat-val">${state.resetTimestamp}</span></div>`;
 }
 
@@ -767,4 +812,85 @@ function _toggleFuelAddedField() {
     fuelAddedRow.style.opacity     = "1";
     fuelAddedRow.style.pointerEvents = "";
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NAVIONICS GPX PARSING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Extract the clean share URL from pasted text (strips the "Hey check..." suffix)
+function _extractNavUrl(text) {
+  const match = text.match(/https:\/\/marine\.garmin\.com\/sclsharing\/preview\?[^\s]+/);
+  return match ? match[0] : "";
+}
+
+// Derive the GPX API URL from the share URL
+function _navApiUrl(shareUrl) {
+  const match = shareUrl.match(/archive=([a-f0-9\-]{36})/i);
+  if (!match) throw new Error("Could not find archive ID in Navionics URL.");
+  return `https://marine.garmin.com/sclsharing/api/v1/share/file/${match[1]}`;
+}
+
+// Fetch GPX and extract stats: duration, distance (nm), max speed (kts)
+async function _fetchNavStats(shareUrl) {
+  const apiUrl = _navApiUrl(shareUrl);
+  const res    = await fetch(apiUrl);
+  if (!res.ok) throw new Error(`Navionics API HTTP ${res.status}`);
+  const gpxText = await res.text();
+
+  const parser  = new DOMParser();
+  const doc     = parser.parseFromString(gpxText, "application/xml");
+  const trkpts  = [...doc.querySelectorAll("trkpt")];
+  if (trkpts.length < 2) throw new Error("Track has fewer than 2 points.");
+
+  // Build array of {lat, lon, time} objects
+  const points = trkpts.map(pt => ({
+    lat:  parseFloat(pt.getAttribute("lat")),
+    lon:  parseFloat(pt.getAttribute("lon")),
+    time: new Date(pt.querySelector("time")?.textContent || 0)
+  })).filter(p => !isNaN(p.lat) && !isNaN(p.lon) && p.time > 0);
+
+  if (points.length < 2) throw new Error("Insufficient valid track points.");
+
+  // Duration
+  const startTime  = points[0].time;
+  const endTime    = points[points.length - 1].time;
+  const durationMs = endTime - startTime;
+  const duration   = _formatDuration(durationMs);
+
+  // Distance (Haversine, accumulate segment lengths) in nautical miles
+  let totalMeters = 0;
+  let maxSpeedKts = 0;
+  for (let i = 1; i < points.length; i++) {
+    const segMeters  = _haversineMeters(points[i-1], points[i]);
+    totalMeters     += segMeters;
+    const segMs      = points[i].time - points[i-1].time;
+    if (segMs > 0) {
+      const segKts = (segMeters / segMs) * 1943.84; // m/ms → knots
+      if (segKts > maxSpeedKts && segKts < 50) maxSpeedKts = segKts; // cap outliers
+    }
+  }
+  const distanceNm = (totalMeters / 1852).toFixed(1);
+  const maxSpeed   = maxSpeedKts.toFixed(1);
+
+  return { duration, distance: distanceNm, maxSpeed };
+}
+
+// Haversine distance between two {lat,lon} points in meters
+function _haversineMeters(a, b) {
+  const R    = 6371000; // Earth radius in meters
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lon - a.lon) * Math.PI / 180;
+  const sin2 = Math.sin(dLat/2) ** 2 +
+               Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) *
+               Math.sin(dLon/2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(sin2));
+}
+
+// Format milliseconds as "Xh Ym"
+function _formatDuration(ms) {
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
