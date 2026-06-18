@@ -49,6 +49,10 @@ async function showApp() {
   const defUserEl = document.getElementById("s-default-user");
   if (defUserEl) defUserEl.value = currentUser;
 
+  // Populate burn rate field (boat only)
+  const burnRateEl = document.getElementById("s-burn-rate");
+  if (burnRateEl) burnRateEl.value = localStorage.getItem("boat_burnRate") || "0.5";
+
   // Load each tab according to its type
   const loads = APP_CONFIG.tabs
     .filter(t => t.type === "chores")
@@ -114,6 +118,14 @@ function saveSettings() {
   currentUser = defaultUser;
   document.querySelectorAll(".user-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.user === currentUser));
+
+  // Burn rate (boat only)
+  const burnRateEl = document.getElementById("s-burn-rate");
+  if (burnRateEl) {
+    const rate = parseFloat(burnRateEl.value);
+    if (!isNaN(rate) && rate > 0) localStorage.setItem("boat_burnRate", rate.toString());
+  }
+
   // Show confirmation on whichever status indicator is available
   const dotEl  = document.getElementById("status-dot")  || document.getElementById("trips-status-dot");
   const textEl = document.getElementById("status-text") || document.getElementById("trips-status-text");
@@ -595,7 +607,7 @@ function formatTimestamp(ts) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const FUEL_TANK_CAPACITY = 30;    // gallons
-const FUEL_BURN_RATE     = 0.5;   // gallons per engine hour
+const FUEL_BURN_RATE     = () => parseFloat(localStorage.getItem("boat_burnRate") || "0.5");
 const FUEL_LOW_THRESHOLD = 10;    // gallons — warn below this
 const FUEL_SHEET         = "Fuel";
 
@@ -605,7 +617,7 @@ async function _readFuelRows() {
   const token = await getAccessToken();
   const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
   const res = await fetch(
-    `${SHEETS_API}/${id}/values/${FUEL_SHEET}!A2:E`,
+    `${SHEETS_API}/${id}/values/${FUEL_SHEET}!A2:E1000`,
     { headers: { "Authorization": `Bearer ${token}` } }
   );
   if (!res.ok) {
@@ -664,7 +676,7 @@ function _computeFuelState(rows) {
   const latestHours = rows[rows.length - 1].engineHours;
 
   const hoursSinceReset  = Math.max(0, latestHours - baseline.engineHours);
-  const gallonsBurned    = hoursSinceReset * FUEL_BURN_RATE;
+  const gallonsBurned    = hoursSinceReset * FUEL_BURN_RATE();
   const partialFillsSince = rowsSince.reduce((sum, r) => sum + (r.resetToFull ? 0 : r.fuelAdded), 0);
   const gallonsRemaining = Math.max(0, FUEL_TANK_CAPACITY - gallonsBurned + partialFillsSince);
   const gallonsToFill    = Math.max(0, FUEL_TANK_CAPACITY - gallonsRemaining);
