@@ -33,10 +33,10 @@
   .fuel-form            { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
   .fuel-field           { display: flex; flex-direction: column; gap: 6px; }
   .fuel-field label     { font-size: 13px; color: var(--text-muted, #aaa); }
-  .fuel-input           { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-                          border-radius: 8px; color: inherit; font-size: 16px; padding: 10px 12px;
-                          font-family: inherit; width: 100%; box-sizing: border-box; }
-  .fuel-input:focus     { outline: none; border-color: rgba(255,255,255,0.4); }
+  .fuel-input           { background: var(--bg); border: 1.5px solid var(--border);
+                          border-radius: 10px; color: var(--ink); font-size: 15px; padding: 10px 14px;
+                          font-family: 'DM Sans', sans-serif; width: 100%; box-sizing: border-box; }
+  .fuel-input:focus     { outline: none; border-color: var(--accent); }
   .fuel-reset-row       { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
   .fuel-reset-row input { width: 18px; height: 18px; cursor: pointer; accent-color: #27ae60; }
   .fuel-reset-row label { font-size: 15px; cursor: pointer; }
@@ -49,10 +49,11 @@
   /* ── Trip stats fields ───────────────────────────────────── */
   .trip-stats-row       { display: flex; gap: 10px; }
   .trip-stat-field      { display: flex; flex-direction: column; gap: 5px; flex: 1; }
-  .trip-stat-field label { font-size: 12px; color: var(--text-muted, #aaa); }
+  .trip-stat-field label { font-size: 12px; color: var(--ink2); }
   .nav-stats            { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .nav-stat             { background: rgba(52,152,219,0.15); border: 1px solid rgba(52,152,219,0.3);
-                          border-radius: 6px; padding: 3px 9px; font-size: 13px; color: #7fb9e0; }
+  .nav-stat             { background: var(--surface2); border: 1px solid var(--border);
+                          border-radius: 20px; padding: 2px 8px; font-size: 13px;
+                          font-weight: 600; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -107,15 +108,15 @@
       <div class="trip-stats-row">
         <div class="trip-stat-field">
           <label for="trips-duration">Time (hrs)</label>
-          <input class="fuel-input" type="number" id="trips-duration" min="0" step="0.1" placeholder="0.0">
+          <input class="diary-textarea" style="min-height:0;resize:none" type="number" id="trips-duration" min="0" step="0.1" placeholder="0.0">
         </div>
         <div class="trip-stat-field">
           <label for="trips-distance">Distance (nm)</label>
-          <input class="fuel-input" type="number" id="trips-distance" min="0" step="0.1" placeholder="0.0">
+          <input class="diary-textarea" style="min-height:0;resize:none" type="number" id="trips-distance" min="0" step="0.1" placeholder="0.0">
         </div>
         <div class="trip-stat-field">
           <label for="trips-maxspeed">Max Speed (kts)</label>
-          <input class="fuel-input" type="number" id="trips-maxspeed" min="0" step="0.1" placeholder="0.0">
+          <input class="diary-textarea" style="min-height:0;resize:none" type="number" id="trips-maxspeed" min="0" step="0.1" placeholder="0.0">
         </div>
       </div>
       <button class="diary-submit" onclick="submitFreeformEntry('trips')">Save Entry</button>
