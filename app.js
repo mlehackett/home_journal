@@ -23,6 +23,31 @@ let speciesList = []; // [{name, histOpen}]
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+  // Auto-format trips-duration field to hh:mm on blur
+  const durEl = document.getElementById("trips-duration");
+  if (durEl) {
+    durEl.addEventListener("blur", () => {
+      const val = durEl.value.trim();
+      if (!val) return;
+      // Already formatted
+      if (/^\d+:\d{2}$/.test(val)) return;
+      // Plain digits: treat as total minutes if ≤4 digits, else first digits=hours remainder=mins
+      const digits = val.replace(/\D/g, "");
+      if (!digits) return;
+      let h, m;
+      if (digits.length <= 2) {
+        // Interpret as minutes only
+        h = 0; m = parseInt(digits, 10);
+      } else {
+        // Last two digits = minutes, rest = hours
+        m = parseInt(digits.slice(-2), 10);
+        h = parseInt(digits.slice(0, -2), 10);
+      }
+      if (m >= 60) { h += Math.floor(m / 60); m = m % 60; }
+      durEl.value = `${h}:${String(m).padStart(2, "0")}`;
+    });
+  }
+
   const storedDefault = localStorage.getItem(STORAGE_USER);
   if (storedDefault) currentUser = storedDefault;
 
